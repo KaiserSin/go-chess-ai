@@ -1,4 +1,4 @@
-package chess
+package model
 
 import "fmt"
 
@@ -14,7 +14,17 @@ const (
 	King
 )
 
-var promotionChoices = [...]PieceType{Queen, Rook, Bishop, Knight}
+type Piece struct {
+	side Side
+	kind PieceType
+}
+
+func NewPiece(side Side, kind PieceType) Piece {
+	return Piece{
+		side: side,
+		kind: kind,
+	}
+}
 
 func (pt PieceType) String() string {
 	switch pt {
@@ -41,19 +51,6 @@ func (pt PieceType) isValid() bool {
 	return pt >= NoPieceType && pt <= King
 }
 
-func (pt PieceType) bitboardIndex() int {
-	return int(pt - 1)
-}
-
-func (pt PieceType) isPromotionChoice() bool {
-	switch pt {
-	case Queen, Rook, Bishop, Knight:
-		return true
-	default:
-		return false
-	}
-}
-
 func (pt PieceType) symbol() string {
 	switch pt {
 	case Pawn:
@@ -70,18 +67,6 @@ func (pt PieceType) symbol() string {
 		return "k"
 	default:
 		return "?"
-	}
-}
-
-type Piece struct {
-	side Side
-	kind PieceType
-}
-
-func newPiece(side Side, kind PieceType) Piece {
-	return Piece{
-		side: side,
-		kind: kind,
 	}
 }
 

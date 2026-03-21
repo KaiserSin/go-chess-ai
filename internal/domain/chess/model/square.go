@@ -1,4 +1,4 @@
-package chess
+package model
 
 import "fmt"
 
@@ -15,15 +15,6 @@ func NewSquare(file, rank int) (Square, error) {
 	}
 
 	return Square(rank*boardFiles + file), nil
-}
-
-func mustSquare(file, rank int) Square {
-	square, err := NewSquare(file, rank)
-	if err != nil {
-		panic(err)
-	}
-
-	return square
 }
 
 func ParseSquare(raw string) (Square, error) {
@@ -45,8 +36,16 @@ func (s Square) Rank() int {
 	return int(s) / boardFiles
 }
 
+func (s Square) String() string {
+	if !s.isValid() {
+		return "<invalid>"
+	}
+
+	return fmt.Sprintf("%c%d", 'a'+s.File(), s.Rank()+1)
+}
+
 func (s Square) isValid() bool {
-	return int(s) >= 0 && int(s) < boardFiles*boardRanks
+	return int(s) < boardFiles*boardRanks
 }
 
 func (s Square) bitboard() uint64 {
@@ -64,33 +63,18 @@ func (s Square) offset(fileDelta, rankDelta int) (Square, bool) {
 		return 0, false
 	}
 
-	return mustSquare(file, rank), true
-}
-
-func (s Square) String() string {
-	if !s.isValid() {
-		return "<invalid>"
-	}
-
-	return fmt.Sprintf("%c%d", 'a'+s.File(), s.Rank()+1)
+	return Square(rank*boardFiles + file), true
 }
 
 func (s Square) color() int {
 	return (s.File() + s.Rank()) % 2
 }
 
-type optionalSquare struct {
-	value Square
-	ok    bool
-}
-
-func noSquare() optionalSquare {
-	return optionalSquare{}
-}
-
-func someSquare(square Square) optionalSquare {
-	return optionalSquare{
-		value: square,
-		ok:    true,
+func mustSquare(file, rank int) Square {
+	square, err := NewSquare(file, rank)
+	if err != nil {
+		panic(err)
 	}
+
+	return square
 }

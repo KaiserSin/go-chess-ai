@@ -1,4 +1,4 @@
-package chess
+package model
 
 import "fmt"
 
@@ -8,8 +8,6 @@ const (
 	White Side = iota
 	Black
 )
-
-var allSides = [...]Side{White, Black}
 
 func (s Side) Opponent() Side {
 	if s == Black {
@@ -32,8 +30,4 @@ func (s Side) String() string {
 
 func (s Side) isValid() bool {
 	return s == White || s == Black
-}
-
-func (s Side) index() int {
-	return int(s)
 }

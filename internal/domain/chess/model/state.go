@@ -1,4 +1,4 @@
-package chess
+package model
 
 import "fmt"
 
@@ -10,17 +10,6 @@ const (
 	BlackKingSide
 	BlackQueenSide
 )
-
-type castleSide uint8
-
-const (
-	kingSide castleSide = iota
-	queenSide
-)
-
-func initialCastlingRights() CastlingRights {
-	return WhiteKingSide | WhiteQueenSide | BlackKingSide | BlackQueenSide
-}
 
 func (c CastlingRights) CanCastleKingside(side Side) bool {
 	if side == White {
@@ -38,36 +27,24 @@ func (c CastlingRights) CanCastleQueenside(side Side) bool {
 	return c&BlackQueenSide != 0
 }
 
-func (c *CastlingRights) removeKingside(side Side) {
+func (c CastlingRights) WithoutKingside(side Side) CastlingRights {
 	if side == White {
-		*c &^= WhiteKingSide
-		return
+		return c &^ WhiteKingSide
 	}
 
-	*c &^= BlackKingSide
+	return c &^ BlackKingSide
 }
 
-func (c *CastlingRights) removeQueenside(side Side) {
+func (c CastlingRights) WithoutQueenside(side Side) CastlingRights {
 	if side == White {
-		*c &^= WhiteQueenSide
-		return
+		return c &^ WhiteQueenSide
 	}
 
-	*c &^= BlackQueenSide
+	return c &^ BlackQueenSide
 }
 
-func (c *CastlingRights) removeSide(side Side) {
-	c.removeKingside(side)
-	c.removeQueenside(side)
-}
-
-func (c *CastlingRights) remove(side Side, castle castleSide) {
-	if castle == kingSide {
-		c.removeKingside(side)
-		return
-	}
-
-	c.removeQueenside(side)
+func (c CastlingRights) WithoutSide(side Side) CastlingRights {
+	return c.WithoutKingside(side).WithoutQueenside(side)
 }
 
 type Status uint8

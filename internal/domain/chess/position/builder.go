@@ -1,9 +1,11 @@
-package chess
+package position
+
+import chessmodel "github.com/KaiserSin/go-chess-ai/internal/domain/chess/model"
 
 type PositionBuilder struct {
 	board          Board
-	sideToMove     Side
-	castlingRights CastlingRights
+	sideToMove     chessmodel.Side
+	castlingRights chessmodel.CastlingRights
 	enPassant      optionalSquare
 	halfmoveClock  int
 	fullmoveNumber int
@@ -13,7 +15,7 @@ type PositionBuilder struct {
 func NewPositionBuilder() *PositionBuilder {
 	return &PositionBuilder{
 		board:          newEmptyBoard(),
-		sideToMove:     White,
+		sideToMove:     chessmodel.White,
 		castlingRights: 0,
 		enPassant:      noSquare(),
 		halfmoveClock:  0,
@@ -21,13 +23,13 @@ func NewPositionBuilder() *PositionBuilder {
 	}
 }
 
-func (b *PositionBuilder) WithSideToMove(side Side) *PositionBuilder {
+func (b *PositionBuilder) WithSideToMove(side chessmodel.Side) *PositionBuilder {
 	if b.err != nil {
 		return b
 	}
 
-	if !side.isValid() {
-		b.err = ErrInvalidPosition
+	if !isValidSide(side) {
+		b.err = chessmodel.ErrInvalidPosition
 		return b
 	}
 
@@ -35,7 +37,7 @@ func (b *PositionBuilder) WithSideToMove(side Side) *PositionBuilder {
 	return b
 }
 
-func (b *PositionBuilder) WithCastlingRights(rights CastlingRights) *PositionBuilder {
+func (b *PositionBuilder) WithCastlingRights(rights chessmodel.CastlingRights) *PositionBuilder {
 	if b.err != nil {
 		return b
 	}
@@ -44,13 +46,13 @@ func (b *PositionBuilder) WithCastlingRights(rights CastlingRights) *PositionBui
 	return b
 }
 
-func (b *PositionBuilder) WithEnPassantSquare(square Square) *PositionBuilder {
+func (b *PositionBuilder) WithEnPassantSquare(square chessmodel.Square) *PositionBuilder {
 	if b.err != nil {
 		return b
 	}
 
-	if !square.isValid() {
-		b.err = ErrInvalidSquare
+	if !squareIsValid(square) {
+		b.err = chessmodel.ErrInvalidSquare
 		return b
 	}
 
@@ -64,7 +66,7 @@ func (b *PositionBuilder) WithHalfmoveClock(clock int) *PositionBuilder {
 	}
 
 	if clock < 0 {
-		b.err = ErrInvalidPosition
+		b.err = chessmodel.ErrInvalidPosition
 		return b
 	}
 
@@ -78,7 +80,7 @@ func (b *PositionBuilder) WithFullmoveNumber(number int) *PositionBuilder {
 	}
 
 	if number <= 0 {
-		b.err = ErrInvalidPosition
+		b.err = chessmodel.ErrInvalidPosition
 		return b
 	}
 
@@ -86,22 +88,22 @@ func (b *PositionBuilder) WithFullmoveNumber(number int) *PositionBuilder {
 	return b
 }
 
-func (b *PositionBuilder) Place(square Square, side Side, pieceType PieceType) *PositionBuilder {
+func (b *PositionBuilder) Place(square chessmodel.Square, side chessmodel.Side, pieceType chessmodel.PieceType) *PositionBuilder {
 	if b.err != nil {
 		return b
 	}
 
-	if !square.isValid() {
-		b.err = ErrInvalidSquare
+	if !squareIsValid(square) {
+		b.err = chessmodel.ErrInvalidSquare
 		return b
 	}
 
-	if !side.isValid() || pieceType < Pawn || pieceType > King {
-		b.err = ErrInvalidPosition
+	if !isValidSide(side) || pieceType < chessmodel.Pawn || pieceType > chessmodel.King {
+		b.err = chessmodel.ErrInvalidPosition
 		return b
 	}
 
-	b.board.placePiece(newPiece(side, pieceType), square)
+	b.board.placePiece(chessmodel.NewPiece(side, pieceType), square)
 	return b
 }
 

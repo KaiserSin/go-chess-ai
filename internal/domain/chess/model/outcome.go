@@ -1,4 +1,4 @@
-package chess
+package model
 
 import "fmt"
 
@@ -12,6 +12,30 @@ const (
 	OutcomeByFiftyMoveRule
 	OutcomeByInsufficientMaterial
 )
+
+type Outcome struct {
+	reason    OutcomeReason
+	winner    Side
+	hasWinner bool
+}
+
+func NoOutcome() Outcome {
+	return Outcome{}
+}
+
+func NewDecisiveOutcome(winner Side, reason OutcomeReason) Outcome {
+	return Outcome{
+		reason:    reason,
+		winner:    winner,
+		hasWinner: true,
+	}
+}
+
+func NewDrawOutcome(reason OutcomeReason) Outcome {
+	return Outcome{
+		reason: reason,
+	}
+}
 
 func (r OutcomeReason) String() string {
 	switch r {
@@ -29,30 +53,6 @@ func (r OutcomeReason) String() string {
 		return "not enough material"
 	default:
 		return fmt.Sprintf("outcome_reason(%d)", r)
-	}
-}
-
-type Outcome struct {
-	reason    OutcomeReason
-	winner    Side
-	hasWinner bool
-}
-
-func noOutcome() Outcome {
-	return Outcome{}
-}
-
-func decisiveOutcome(winner Side, reason OutcomeReason) Outcome {
-	return Outcome{
-		reason:    reason,
-		winner:    winner,
-		hasWinner: true,
-	}
-}
-
-func drawOutcome(reason OutcomeReason) Outcome {
-	return Outcome{
-		reason: reason,
 	}
 }
 

@@ -1,14 +1,14 @@
 package chess
 
-import "errors"
+import chessmodel "github.com/KaiserSin/go-chess-ai/internal/domain/chess/model"
 
 var (
-	ErrInvalidSquare     = errors.New("bad square")
-	ErrInvalidPosition   = errors.New("bad position")
-	ErrNoPiece           = errors.New("no piece")
-	ErrWrongSide         = errors.New("wrong side")
-	ErrInvalidMove       = errors.New("bad move")
-	ErrGameFinished      = errors.New("game is over")
-	ErrPromotionRequired = errors.New("need promotion piece")
-	ErrInvalidPromotion  = errors.New("bad promotion piece")
+	ErrInvalidSquare     = chessmodel.ErrInvalidSquare
+	ErrInvalidPosition   = chessmodel.ErrInvalidPosition
+	ErrNoPiece           = chessmodel.ErrNoPiece
+	ErrWrongSide         = chessmodel.ErrWrongSide
+	ErrInvalidMove       = chessmodel.ErrInvalidMove
+	ErrGameFinished      = chessmodel.ErrGameFinished
+	ErrPromotionRequired = chessmodel.ErrPromotionRequired
+	ErrInvalidPromotion  = chessmodel.ErrInvalidPromotion
 )
