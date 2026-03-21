@@ -28,14 +28,11 @@ func (p Position) generatePseudoLegalMoves() []Move {
 			case Knight:
 				p.appendKnightMoves(&moves, from, side)
 			case Bishop:
-				p.appendSlidingMoves(&moves, from, side, [][2]int{{1, 1}, {1, -1}, {-1, 1}, {-1, -1}})
+				p.appendSlidingMoves(&moves, from, side, bishopDirections)
 			case Rook:
-				p.appendSlidingMoves(&moves, from, side, [][2]int{{1, 0}, {-1, 0}, {0, 1}, {0, -1}})
+				p.appendSlidingMoves(&moves, from, side, rookDirections)
 			case Queen:
-				p.appendSlidingMoves(&moves, from, side, [][2]int{
-					{1, 1}, {1, -1}, {-1, 1}, {-1, -1},
-					{1, 0}, {-1, 0}, {0, 1}, {0, -1},
-				})
+				p.appendSlidingMoves(&moves, from, side, queenDirections)
 			case King:
 				p.appendKingMoves(&moves, from, side)
 			}
@@ -46,14 +43,9 @@ func (p Position) generatePseudoLegalMoves() []Move {
 }
 
 func (p Position) appendPawnMoves(moves *[]Move, from Square, side Side) {
-	direction := 1
-	startRank := 1
-	promotionRank := 7
-	if side == Black {
-		direction = -1
-		startRank = 6
-		promotionRank = 0
-	}
+	direction := pawnDirection(side)
+	startRank := pawnStartRank(side)
+	promotionRank := pawnPromotionRank(side)
 
 	oneForward, ok := from.offset(0, direction)
 	if ok && !p.board.occupied(oneForward) {
@@ -65,7 +57,7 @@ func (p Position) appendPawnMoves(moves *[]Move, from Square, side Side) {
 		}
 	}
 
-	for _, fileDelta := range []int{-1, 1} {
+	for _, fileDelta := range pawnCaptureFiles {
 		target, canCapture := from.offset(fileDelta, direction)
 		if !canCapture {
 			continue
@@ -98,12 +90,7 @@ func (p Position) appendPawnMove(moves *[]Move, from, to Square, promotionRank i
 }
 
 func (p Position) appendKnightMoves(moves *[]Move, from Square, side Side) {
-	offsets := [][2]int{
-		{1, 2}, {2, 1}, {2, -1}, {1, -2},
-		{-1, -2}, {-2, -1}, {-2, 1}, {-1, 2},
-	}
-
-	for _, offset := range offsets {
+	for _, offset := range knightOffsets {
 		target, ok := from.offset(offset[0], offset[1])
 		if !ok || p.board.occupiedBy(side, target) {
 			continue
@@ -137,162 +124,110 @@ func (p Position) appendSlidingMoves(moves *[]Move, from Square, side Side, dire
 }
 
 func (p Position) appendKingMoves(moves *[]Move, from Square, side Side) {
-	for rankDelta := -1; rankDelta <= 1; rankDelta++ {
-		for fileDelta := -1; fileDelta <= 1; fileDelta++ {
-			if fileDelta == 0 && rankDelta == 0 {
-				continue
-			}
-
-			target, ok := from.offset(fileDelta, rankDelta)
-			if !ok || p.board.occupiedBy(side, target) {
-				continue
-			}
-
-			*moves = append(*moves, Move{From: from, To: target})
+	for _, offset := range kingOffsets {
+		target, ok := from.offset(offset[0], offset[1])
+		if !ok || p.board.occupiedBy(side, target) {
+			continue
 		}
+
+		*moves = append(*moves, Move{From: from, To: target})
 	}
 
 	if p.canCastleKingside(side) {
-		rank := 0
-		if side == Black {
-			rank = 7
-		}
-		*moves = append(*moves, Move{From: from, To: mustSquare(6, rank)})
+		*moves = append(*moves, Move{From: from, To: castleKingSquare(side, kingSide)})
 	}
 
 	if p.canCastleQueenside(side) {
-		rank := 0
-		if side == Black {
-			rank = 7
-		}
-		*moves = append(*moves, Move{From: from, To: mustSquare(2, rank)})
+		*moves = append(*moves, Move{From: from, To: castleKingSquare(side, queenSide)})
 	}
 }
 
 func (p Position) canCastleKingside(side Side) bool {
-	if !p.castlingRights.CanCastleKingside(side) {
-		return false
-	}
-
-	rank := 0
-	if side == Black {
-		rank = 7
-	}
-
-	kingFrom := mustSquare(4, rank)
-	rookFrom := mustSquare(7, rank)
-	fSquare := mustSquare(5, rank)
-	gSquare := mustSquare(6, rank)
-
-	king, kingPresent := p.board.pieceAt(kingFrom)
-	rook, rookPresent := p.board.pieceAt(rookFrom)
-	if !kingPresent || !rookPresent || king.kind != King || king.side != side || rook.kind != Rook || rook.side != side {
-		return false
-	}
-
-	if p.board.occupied(fSquare) || p.board.occupied(gSquare) {
-		return false
-	}
-
-	opponent := side.Opponent()
-	if p.isSquareAttacked(kingFrom, opponent) || p.isSquareAttacked(fSquare, opponent) || p.isSquareAttacked(gSquare, opponent) {
-		return false
-	}
-
-	return true
+	return p.canCastle(side, kingSide)
 }
 
 func (p Position) canCastleQueenside(side Side) bool {
-	if !p.castlingRights.CanCastleQueenside(side) {
+	return p.canCastle(side, queenSide)
+}
+
+func (p Position) canCastle(side Side, castle castleSide) bool {
+	if castle == kingSide && !p.castlingRights.CanCastleKingside(side) {
 		return false
 	}
 
-	rank := 0
-	if side == Black {
-		rank = 7
-	}
-
-	kingFrom := mustSquare(4, rank)
-	rookFrom := mustSquare(0, rank)
-	bSquare := mustSquare(1, rank)
-	cSquare := mustSquare(2, rank)
-	dSquare := mustSquare(3, rank)
-
-	king, kingPresent := p.board.pieceAt(kingFrom)
-	rook, rookPresent := p.board.pieceAt(rookFrom)
-	if !kingPresent || !rookPresent || king.kind != King || king.side != side || rook.kind != Rook || rook.side != side {
+	if castle == queenSide && !p.castlingRights.CanCastleQueenside(side) {
 		return false
 	}
 
-	if p.board.occupied(bSquare) || p.board.occupied(cSquare) || p.board.occupied(dSquare) {
+	if !p.hasCastlingPieces(side, castle) {
 		return false
+	}
+
+	for _, square := range castleTravelSquares(side, castle) {
+		if p.board.occupied(square) {
+			return false
+		}
 	}
 
 	opponent := side.Opponent()
-	if p.isSquareAttacked(kingFrom, opponent) || p.isSquareAttacked(dSquare, opponent) || p.isSquareAttacked(cSquare, opponent) {
-		return false
+	for _, square := range castleSafeSquares(side, castle) {
+		if p.isSquareAttacked(square, opponent) {
+			return false
+		}
 	}
 
 	return true
 }
 
-func (p Position) isSquareAttacked(square Square, by Side) bool {
-	pawnRankDelta := -1
-	if by == Black {
-		pawnRankDelta = 1
+func (p Position) hasCastlingPieces(side Side, castle castleSide) bool {
+	king, kingPresent := p.board.pieceAt(kingStartSquare(side))
+	rook, rookPresent := p.board.pieceAt(rookStartSquare(side, castle))
+	if !kingPresent || !rookPresent {
+		return false
 	}
 
-	for _, pawnFileDelta := range []int{-1, 1} {
-		source, ok := square.offset(pawnFileDelta, pawnRankDelta)
+	return king.kind == King && king.side == side && rook.kind == Rook && rook.side == side
+}
+
+func (p Position) isSquareAttacked(square Square, by Side) bool {
+	for _, pawnFileDelta := range pawnCaptureFiles {
+		source, ok := square.offset(pawnFileDelta, -pawnDirection(by))
 		if !ok {
 			continue
 		}
 
-		piece, found := p.board.pieceAt(source)
-		if found && piece.side == by && piece.kind == Pawn {
+		if p.hasPiece(source, by, Pawn) {
 			return true
 		}
 	}
 
-	knightOffsets := [][2]int{
-		{1, 2}, {2, 1}, {2, -1}, {1, -2},
-		{-1, -2}, {-2, -1}, {-2, 1}, {-1, 2},
-	}
 	for _, offset := range knightOffsets {
 		source, ok := square.offset(offset[0], offset[1])
 		if !ok {
 			continue
 		}
 
-		piece, found := p.board.pieceAt(source)
-		if found && piece.side == by && piece.kind == Knight {
+		if p.hasPiece(source, by, Knight) {
 			return true
 		}
 	}
 
-	if p.attackedBySliding(square, by, [][2]int{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}, Rook, Queen) {
+	if p.attackedBySliding(square, by, rookDirections, Rook, Queen) {
 		return true
 	}
 
-	if p.attackedBySliding(square, by, [][2]int{{1, 1}, {1, -1}, {-1, 1}, {-1, -1}}, Bishop, Queen) {
+	if p.attackedBySliding(square, by, bishopDirections, Bishop, Queen) {
 		return true
 	}
 
-	for rankDelta := -1; rankDelta <= 1; rankDelta++ {
-		for fileDelta := -1; fileDelta <= 1; fileDelta++ {
-			if fileDelta == 0 && rankDelta == 0 {
-				continue
-			}
+	for _, offset := range kingOffsets {
+		source, ok := square.offset(offset[0], offset[1])
+		if !ok {
+			continue
+		}
 
-			source, ok := square.offset(fileDelta, rankDelta)
-			if !ok {
-				continue
-			}
-
-			piece, found := p.board.pieceAt(source)
-			if found && piece.side == by && piece.kind == King {
-				return true
-			}
+		if p.hasPiece(source, by, King) {
+			return true
 		}
 	}
 
@@ -323,4 +258,9 @@ func (p Position) attackedBySliding(square Square, by Side, directions [][2]int,
 	}
 
 	return false
+}
+
+func (p Position) hasPiece(square Square, side Side, kind PieceType) bool {
+	piece, found := p.board.pieceAt(square)
+	return found && piece.side == side && piece.kind == kind
 }

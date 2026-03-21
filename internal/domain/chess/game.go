@@ -7,7 +7,18 @@ type Game struct {
 }
 
 func NewGame() *Game {
-	position := NewInitialPosition()
+	return newGameFromValidatedPosition(NewInitialPosition())
+}
+
+func NewGameFromPosition(position Position) (*Game, error) {
+	if err := position.validate(); err != nil {
+		return nil, err
+	}
+
+	return newGameFromValidatedPosition(position), nil
+}
+
+func newGameFromValidatedPosition(position Position) *Game {
 	game := &Game{
 		position: position,
 		history:  newRepetitionHistory(),
@@ -17,22 +28,6 @@ func NewGame() *Game {
 	game.outcome = game.resolveOutcome()
 
 	return game
-}
-
-func NewGameFromPosition(position Position) (*Game, error) {
-	if err := position.validate(); err != nil {
-		return nil, err
-	}
-
-	game := &Game{
-		position: position,
-		history:  newRepetitionHistory(),
-	}
-
-	game.history.record(position)
-	game.outcome = game.resolveOutcome()
-
-	return game, nil
 }
 
 func (g *Game) Position() Position {

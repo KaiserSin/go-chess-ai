@@ -39,7 +39,7 @@ func (b Board) pieceAt(square Square) (Piece, bool) {
 	}
 
 	mask := square.bitboard()
-	for _, side := range []Side{White, Black} {
+	for _, side := range allSides {
 		for pieceType := Pawn; pieceType <= King; pieceType++ {
 			if b.pieces[side.index()][pieceType.bitboardIndex()]&mask != 0 {
 				return newPiece(side, pieceType), true
@@ -72,7 +72,7 @@ func (b *Board) removePiece(square Square) (Piece, bool) {
 	}
 
 	mask := square.bitboard()
-	for _, side := range []Side{White, Black} {
+	for _, side := range allSides {
 		sideIndex := side.index()
 		for pieceType := Pawn; pieceType <= King; pieceType++ {
 			pieceIndex := pieceType.bitboardIndex()

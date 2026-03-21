@@ -55,47 +55,19 @@ func (p Position) IsLegalMove(move Move) bool {
 		return false
 	}
 
-	for _, candidate := range p.generateLegalMoves() {
-		if candidate == move {
-			return true
-		}
-	}
-
-	return false
+	return p.hasLegalMove(move)
 }
 
 func (p Position) ApplyMove(move Move) (Position, error) {
-	if err := move.validateSquares(); err != nil {
+	if _, err := p.validateMoveRequest(move); err != nil {
 		return Position{}, err
 	}
 
-	status := p.status()
-	if status == Checkmate || status == Stalemate {
-		return Position{}, ErrGameFinished
+	if !p.hasLegalMove(move) {
+		return Position{}, ErrInvalidMove
 	}
 
-	piece, ok := p.board.pieceAt(move.From)
-	if !ok {
-		return Position{}, ErrNoPiece
-	}
-
-	if piece.side != p.sideToMove {
-		return Position{}, ErrWrongSide
-	}
-
-	if err := validatePromotion(piece, move); err != nil {
-		return Position{}, err
-	}
-
-	for _, candidate := range p.generateLegalMoves() {
-		if candidate != move {
-			continue
-		}
-
-		return p.applyMoveUnchecked(move), nil
-	}
-
-	return Position{}, ErrInvalidMove
+	return p.applyMoveUnchecked(move), nil
 }
 
 func (p Position) IsInCheck(side Side) bool {
@@ -132,9 +104,8 @@ func (p Position) isInCheck(side Side) bool {
 }
 
 func (p Position) status() Status {
-	moves := p.generateLegalMoves()
 	inCheck := p.isInCheck(p.sideToMove)
-	if len(moves) == 0 {
+	if len(p.generateLegalMoves()) == 0 {
 		if inCheck {
 			return Checkmate
 		}
@@ -146,6 +117,46 @@ func (p Position) status() Status {
 	}
 
 	return Ongoing
+}
+
+func (p Position) validateMoveRequest(move Move) (Piece, error) {
+	if err := move.validateSquares(); err != nil {
+		return Piece{}, err
+	}
+
+	if p.isFinishedPosition() {
+		return Piece{}, ErrGameFinished
+	}
+
+	piece, ok := p.board.pieceAt(move.From)
+	if !ok {
+		return Piece{}, ErrNoPiece
+	}
+
+	if piece.side != p.sideToMove {
+		return Piece{}, ErrWrongSide
+	}
+
+	if err := validatePromotion(piece, move); err != nil {
+		return Piece{}, err
+	}
+
+	return piece, nil
+}
+
+func (p Position) isFinishedPosition() bool {
+	status := p.status()
+	return status == Checkmate || status == Stalemate
+}
+
+func (p Position) hasLegalMove(move Move) bool {
+	for _, candidate := range p.generateLegalMoves() {
+		if candidate == move {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (p Position) isFiftyMoveDraw() bool {
@@ -204,22 +215,10 @@ func (p Position) applyMoveUnchecked(move Move) Position {
 
 	piece, _ := next.board.pieceAt(move.From)
 	capturedPiece, captured := next.board.pieceAt(move.To)
+	enPassantCaptureSquare, enPassantCapture := p.enPassantCaptureSquare(piece, move, captured)
 
-	isEnPassantCapture := piece.kind == Pawn &&
-		p.enPassant.ok &&
-		move.To == p.enPassant.value &&
-		move.From.File() != move.To.File() &&
-		!captured
-
-	if isEnPassantCapture {
-		captureRank := move.To.Rank()
-		if piece.side == White {
-			captureRank--
-		} else {
-			captureRank++
-		}
-		captureSquare := mustSquare(move.To.File(), captureRank)
-		capturedPiece, captured = next.board.removePiece(captureSquare)
+	if enPassantCapture {
+		capturedPiece, captured = next.board.removePiece(enPassantCaptureSquare)
 	}
 
 	if piece.kind == Pawn || captured {
@@ -231,19 +230,15 @@ func (p Position) applyMoveUnchecked(move Move) Position {
 	next.updateCastlingRightsForMove(piece, move, capturedPiece, captured)
 
 	next.board.removePiece(move.From)
-	if !isEnPassantCapture {
+	if !enPassantCapture {
 		next.board.removePiece(move.To)
 	}
 
-	if piece.kind == King && absInt(move.To.File()-move.From.File()) == 2 {
+	if isCastlingMove(piece, move) {
 		next.board.placePiece(piece, move.To)
 		next.moveCastlingRook(piece.side, move)
 	} else {
-		finalPiece := piece
-		if piece.kind == Pawn && move.Promotion != NoPieceType {
-			finalPiece = newPiece(piece.side, move.Promotion)
-		}
-		next.board.placePiece(finalPiece, move.To)
+		next.board.placePiece(promotedPiece(piece, move), move.To)
 	}
 
 	if piece.kind == Pawn && absInt(move.To.Rank()-move.From.Rank()) == 2 {
@@ -264,59 +259,54 @@ func (p *Position) updateCastlingRightsForMove(piece Piece, move Move, captured 
 	case King:
 		p.castlingRights.removeSide(piece.side)
 	case Rook:
-		switch move.From {
-		case mustSquare(0, 0):
-			p.castlingRights.removeQueenside(White)
-		case mustSquare(7, 0):
-			p.castlingRights.removeKingside(White)
-		case mustSquare(0, 7):
-			p.castlingRights.removeQueenside(Black)
-		case mustSquare(7, 7):
-			p.castlingRights.removeKingside(Black)
+		if side, castle, ok := rookCastlingRef(move.From); ok {
+			p.castlingRights.remove(side, castle)
 		}
 	}
 
 	if capturedPresent && captured.kind == Rook {
-		switch move.To {
-		case mustSquare(0, 0):
-			p.castlingRights.removeQueenside(White)
-		case mustSquare(7, 0):
-			p.castlingRights.removeKingside(White)
-		case mustSquare(0, 7):
-			p.castlingRights.removeQueenside(Black)
-		case mustSquare(7, 7):
-			p.castlingRights.removeKingside(Black)
+		if side, castle, ok := rookCastlingRef(move.To); ok {
+			p.castlingRights.remove(side, castle)
 		}
 	}
 }
 
 func (p *Position) moveCastlingRook(side Side, move Move) {
-	var rookFrom Square
-	var rookTo Square
-
-	switch {
-	case side == White && move.To == mustSquare(6, 0):
-		rookFrom = mustSquare(7, 0)
-		rookTo = mustSquare(5, 0)
-	case side == White && move.To == mustSquare(2, 0):
-		rookFrom = mustSquare(0, 0)
-		rookTo = mustSquare(3, 0)
-	case side == Black && move.To == mustSquare(6, 7):
-		rookFrom = mustSquare(7, 7)
-		rookTo = mustSquare(5, 7)
-	case side == Black && move.To == mustSquare(2, 7):
-		rookFrom = mustSquare(0, 7)
-		rookTo = mustSquare(3, 7)
-	default:
-		return
-	}
-
-	rook, ok := p.board.removePiece(rookFrom)
+	castle, ok := castleSideFromKingTarget(side, move.To)
 	if !ok {
 		return
 	}
 
-	p.board.placePiece(rook, rookTo)
+	rook, ok := p.board.removePiece(rookStartSquare(side, castle))
+	if !ok {
+		return
+	}
+
+	p.board.placePiece(rook, castleRookSquare(side, castle))
+}
+
+func (p Position) enPassantCaptureSquare(piece Piece, move Move, captured bool) (Square, bool) {
+	if piece.kind != Pawn || !p.enPassant.ok || captured {
+		return 0, false
+	}
+
+	if move.To != p.enPassant.value || move.From.File() == move.To.File() {
+		return 0, false
+	}
+
+	return mustSquare(move.To.File(), move.To.Rank()-pawnDirection(piece.side)), true
+}
+
+func isCastlingMove(piece Piece, move Move) bool {
+	return piece.kind == King && absInt(move.To.File()-move.From.File()) == 2
+}
+
+func promotedPiece(piece Piece, move Move) Piece {
+	if piece.kind == Pawn && move.Promotion != NoPieceType {
+		return newPiece(piece.side, move.Promotion)
+	}
+
+	return piece
 }
 
 func absInt(value int) int {
