@@ -7,10 +7,14 @@ type Game struct {
 }
 
 func NewGame() *Game {
-	game, err := NewGameFromPosition(NewInitialPosition())
-	if err != nil {
-		panic(err)
+	position := NewInitialPosition()
+	game := &Game{
+		position: position,
+		history:  newRepetitionHistory(),
 	}
+
+	game.history.record(position)
+	game.outcome = game.resolveOutcome()
 
 	return game
 }

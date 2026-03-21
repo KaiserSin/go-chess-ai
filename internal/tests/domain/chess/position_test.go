@@ -7,7 +7,7 @@ import (
 	chess "github.com/KaiserSin/go-chess-ai/internal/domain/chess"
 )
 
-func TestSquareParsingAndFormatting(t *testing.T) {
+func TestSquare(t *testing.T) {
 	square, err := chess.NewSquare(4, 3)
 	if err != nil {
 		t.Fatalf("NewSquare error: %v", err)
@@ -31,7 +31,7 @@ func TestSquareParsingAndFormatting(t *testing.T) {
 	}
 }
 
-func TestInitialPositionHasTwentyLegalMoves(t *testing.T) {
+func TestStartMoves(t *testing.T) {
 	position := chess.NewInitialPosition()
 
 	if position.SideToMove() != chess.White {
@@ -52,7 +52,7 @@ func TestInitialPositionHasTwentyLegalMoves(t *testing.T) {
 	}
 }
 
-func TestApplyMoveRejectsEmptySquareAndWrongSide(t *testing.T) {
+func TestBadMoveInput(t *testing.T) {
 	position := chess.NewInitialPosition()
 
 	_, err := position.ApplyMove(chess.Move{From: mustParseSquare(t, "e3"), To: mustParseSquare(t, "e4")})
@@ -66,7 +66,7 @@ func TestApplyMoveRejectsEmptySquareAndWrongSide(t *testing.T) {
 	}
 }
 
-func TestPinnedPieceCannotExposeKing(t *testing.T) {
+func TestPinnedMove(t *testing.T) {
 	position := mustBuildPosition(t,
 		chess.NewPositionBuilder().
 			WithSideToMove(chess.White).
@@ -87,7 +87,7 @@ func TestPinnedPieceCannotExposeKing(t *testing.T) {
 	}
 }
 
-func TestCheckStatusWithoutMate(t *testing.T) {
+func TestCheck(t *testing.T) {
 	position := mustBuildPosition(t,
 		chess.NewPositionBuilder().
 			WithSideToMove(chess.Black).
@@ -109,7 +109,7 @@ func TestCheckStatusWithoutMate(t *testing.T) {
 	}
 }
 
-func TestFoolsMateProducesCheckmate(t *testing.T) {
+func TestCheckmate(t *testing.T) {
 	game := chess.NewGame()
 
 	applyMoves(t, game,
@@ -141,7 +141,7 @@ func TestFoolsMateProducesCheckmate(t *testing.T) {
 	}
 }
 
-func TestStalemateStatus(t *testing.T) {
+func TestStalemate(t *testing.T) {
 	position := mustBuildPosition(t,
 		chess.NewPositionBuilder().
 			WithSideToMove(chess.Black).

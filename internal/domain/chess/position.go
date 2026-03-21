@@ -188,9 +188,6 @@ func validatePromotion(piece Piece, move Move) error {
 		if move.Promotion == NoPieceType {
 			return ErrPromotionRequired
 		}
-		if !move.Promotion.isPromotionChoice() {
-			return ErrInvalidPromotion
-		}
 		return nil
 	}
 

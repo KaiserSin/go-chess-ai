@@ -7,7 +7,7 @@ import (
 	chess "github.com/KaiserSin/go-chess-ai/internal/domain/chess"
 )
 
-func TestStalemateOutcomeIsDraw(t *testing.T) {
+func TestStalemateDraw(t *testing.T) {
 	game := mustBuildGame(t,
 		chess.NewPositionBuilder().
 			WithSideToMove(chess.Black).
@@ -41,7 +41,7 @@ func TestStalemateOutcomeIsDraw(t *testing.T) {
 	}
 }
 
-func TestThreefoldRepetitionDrawFromKnightShuffle(t *testing.T) {
+func TestThreefoldDraw(t *testing.T) {
 	game := chess.NewGame()
 	cycle := []chess.Move{
 		mustMove(t, "g1", "f3"),
@@ -78,7 +78,7 @@ func TestThreefoldRepetitionDrawFromKnightShuffle(t *testing.T) {
 	}
 }
 
-func TestRepetitionIgnoresMoveCounters(t *testing.T) {
+func TestRepetitionIgnoresClocks(t *testing.T) {
 	game := mustBuildGame(t,
 		chess.NewPositionBuilder().
 			WithSideToMove(chess.White).
@@ -108,7 +108,7 @@ func TestRepetitionIgnoresMoveCounters(t *testing.T) {
 	}
 }
 
-func TestNonCapturableEnPassantIgnoredForRepetition(t *testing.T) {
+func TestRepetitionIgnoresBadEnPassant(t *testing.T) {
 	game := mustBuildGame(t,
 		chess.NewPositionBuilder().
 			WithSideToMove(chess.Black).
@@ -138,7 +138,7 @@ func TestNonCapturableEnPassantIgnoredForRepetition(t *testing.T) {
 	}
 }
 
-func TestCapturableEnPassantDistinguishesRepetition(t *testing.T) {
+func TestRepetitionKeepsGoodEnPassant(t *testing.T) {
 	game := mustBuildGame(t,
 		chess.NewPositionBuilder().
 			WithSideToMove(chess.White).
@@ -170,7 +170,7 @@ func TestCapturableEnPassantDistinguishesRepetition(t *testing.T) {
 	}
 }
 
-func TestFiftyMoveRuleDraw(t *testing.T) {
+func TestFiftyMoveDraw(t *testing.T) {
 	game := mustBuildGame(t,
 		chess.NewPositionBuilder().
 			WithSideToMove(chess.White).
@@ -198,7 +198,7 @@ func TestFiftyMoveRuleDraw(t *testing.T) {
 	}
 }
 
-func TestHalfmoveClockResetsAfterPawnMove(t *testing.T) {
+func TestClockResetOnPawnMove(t *testing.T) {
 	game := mustBuildGame(t,
 		chess.NewPositionBuilder().
 			WithSideToMove(chess.White).
@@ -222,7 +222,7 @@ func TestHalfmoveClockResetsAfterPawnMove(t *testing.T) {
 	}
 }
 
-func TestHalfmoveClockResetsAfterCapture(t *testing.T) {
+func TestClockResetOnCapture(t *testing.T) {
 	game := mustBuildGame(t,
 		chess.NewPositionBuilder().
 			WithSideToMove(chess.White).
@@ -246,7 +246,7 @@ func TestHalfmoveClockResetsAfterCapture(t *testing.T) {
 	}
 }
 
-func TestInsufficientMaterialDrawCases(t *testing.T) {
+func TestLowMaterialDraw(t *testing.T) {
 	testCases := []struct {
 		name    string
 		builder *chess.PositionBuilder
@@ -304,7 +304,7 @@ func TestInsufficientMaterialDrawCases(t *testing.T) {
 	}
 }
 
-func TestInsufficientMaterialNegativeCases(t *testing.T) {
+func TestLowMaterialNotDraw(t *testing.T) {
 	testCases := []struct {
 		name    string
 		builder *chess.PositionBuilder

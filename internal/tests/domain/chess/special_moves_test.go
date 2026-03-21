@@ -7,7 +7,7 @@ import (
 	chess "github.com/KaiserSin/go-chess-ai/internal/domain/chess"
 )
 
-func TestKingsideCastlingMovesKingAndRook(t *testing.T) {
+func TestCastleKingSide(t *testing.T) {
 	position := mustBuildPosition(t,
 		chess.NewPositionBuilder().
 			WithSideToMove(chess.White).
@@ -40,7 +40,7 @@ func TestKingsideCastlingMovesKingAndRook(t *testing.T) {
 	}
 }
 
-func TestQueensideCastlingBlockedByAttack(t *testing.T) {
+func TestCastleQueenSideBlocked(t *testing.T) {
 	position := mustBuildPosition(t,
 		chess.NewPositionBuilder().
 			WithSideToMove(chess.White).
@@ -57,7 +57,7 @@ func TestQueensideCastlingBlockedByAttack(t *testing.T) {
 	}
 }
 
-func TestEnPassantCaptureAndExpiration(t *testing.T) {
+func TestEnPassant(t *testing.T) {
 	game := chess.NewGame()
 	applyMoves(t, game,
 		mustMove(t, "e2", "e4"),
@@ -101,7 +101,7 @@ func TestEnPassantCaptureAndExpiration(t *testing.T) {
 	}
 }
 
-func TestPromotionRequiresExplicitChoice(t *testing.T) {
+func TestPromotion(t *testing.T) {
 	position := mustBuildPosition(t,
 		chess.NewPositionBuilder().
 			WithSideToMove(chess.White).
@@ -128,7 +128,7 @@ func TestPromotionRequiresExplicitChoice(t *testing.T) {
 	assertPieceAt(t, next, "g8", chess.White, chess.Queen)
 }
 
-func TestCastlingRightsAndMoveCountersUpdate(t *testing.T) {
+func TestRightsAndCounters(t *testing.T) {
 	game := chess.NewGame()
 	applyMoves(t, game,
 		mustMove(t, "h2", "h4"),
