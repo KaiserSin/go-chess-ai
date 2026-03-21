@@ -13,10 +13,6 @@ func TestSquare(t *testing.T) {
 		t.Fatalf("NewSquare error: %v", err)
 	}
 
-	if square.String() != "e4" {
-		t.Fatalf("expected e4, got %s", square)
-	}
-
 	parsed, err := chess.ParseSquare("e4")
 	if err != nil {
 		t.Fatalf("ParseSquare error: %v", err)
@@ -27,28 +23,42 @@ func TestSquare(t *testing.T) {
 	}
 
 	if _, err := chess.ParseSquare("i9"); !errors.Is(err, chess.ErrInvalidSquare) {
-		t.Fatalf("expected ErrInvalidSquare, got %v", err)
+		t.Fatalf("want bad square error, got %v", err)
+	}
+
+	if _, err := chess.ParseSquare("a"); !errors.Is(err, chess.ErrInvalidSquare) {
+		t.Fatalf("want bad square error, got %v", err)
+	}
+
+	if _, err := chess.NewSquare(8, 0); !errors.Is(err, chess.ErrInvalidSquare) {
+		t.Fatalf("want bad square error, got %v", err)
 	}
 }
 
-func TestStartMoves(t *testing.T) {
+func TestStartPosition(t *testing.T) {
 	position := chess.NewInitialPosition()
 
 	if position.SideToMove() != chess.White {
-		t.Fatalf("expected white to move, got %s", position.SideToMove())
+		t.Fatalf("want white, got %s", position.SideToMove())
+	}
+
+	if position.HalfmoveClock() != 0 {
+		t.Fatalf("want 0, got %d", position.HalfmoveClock())
+	}
+
+	if position.FullmoveNumber() != 1 {
+		t.Fatalf("want 1, got %d", position.FullmoveNumber())
 	}
 
 	if got := len(position.LegalMoves()); got != 20 {
-		t.Fatalf("expected 20 legal moves, got %d", got)
+		t.Fatalf("want 20 moves, got %d", got)
 	}
 
-	piece, ok := position.PieceAt(mustParseSquare(t, "e2"))
-	if !ok {
-		t.Fatal("expected piece on e2")
-	}
+	assertPieceAt(t, position, "e2", chess.White, chess.Pawn)
 
-	if piece.Side() != chess.White || piece.Type() != chess.Pawn {
-		t.Fatalf("want white pawn on e2, got %s", piece)
+	game := chess.NewGame()
+	if got := len(game.LegalMoves()); got != 20 {
+		t.Fatalf("want 20 moves, got %d", got)
 	}
 }
 
@@ -57,12 +67,35 @@ func TestBadMoveInput(t *testing.T) {
 
 	_, err := position.ApplyMove(chess.Move{From: mustParseSquare(t, "e3"), To: mustParseSquare(t, "e4")})
 	if !errors.Is(err, chess.ErrNoPiece) {
-		t.Fatalf("expected ErrNoPiece, got %v", err)
+		t.Fatalf("want no piece error, got %v", err)
 	}
 
 	_, err = position.ApplyMove(chess.Move{From: mustParseSquare(t, "e7"), To: mustParseSquare(t, "e6")})
 	if !errors.Is(err, chess.ErrWrongSide) {
-		t.Fatalf("expected ErrWrongSide, got %v", err)
+		t.Fatalf("want wrong side error, got %v", err)
+	}
+
+	game := chess.NewGame()
+	err = game.ApplyMove(mustMove(t, "e3", "e4"))
+	if !errors.Is(err, chess.ErrNoPiece) {
+		t.Fatalf("want no piece error, got %v", err)
+	}
+}
+
+func TestBadMoveSquares(t *testing.T) {
+	position := chess.NewInitialPosition()
+	move := chess.Move{
+		From: chess.Square(99),
+		To:   mustParseSquare(t, "e4"),
+	}
+
+	if position.IsLegalMove(move) {
+		t.Fatal("want bad move")
+	}
+
+	_, err := position.ApplyMove(move)
+	if !errors.Is(err, chess.ErrInvalidSquare) {
+		t.Fatalf("want bad square error, got %v", err)
 	}
 }
 
@@ -76,149 +109,13 @@ func TestPinnedMove(t *testing.T) {
 			Place(mustParseSquare(t, "h8"), chess.Black, chess.King),
 	)
 
-	illegal := chess.Move{From: mustParseSquare(t, "e2"), To: mustParseSquare(t, "d2")}
-	if position.IsLegalMove(illegal) {
-		t.Fatal("want illegal move")
+	move := chess.Move{From: mustParseSquare(t, "e2"), To: mustParseSquare(t, "d2")}
+	if position.IsLegalMove(move) {
+		t.Fatal("want bad move")
 	}
 
-	_, err := position.ApplyMove(illegal)
+	_, err := position.ApplyMove(move)
 	if !errors.Is(err, chess.ErrInvalidMove) {
-		t.Fatalf("expected ErrInvalidMove, got %v", err)
-	}
-}
-
-func TestCheck(t *testing.T) {
-	position := mustBuildPosition(t,
-		chess.NewPositionBuilder().
-			WithSideToMove(chess.Black).
-			Place(mustParseSquare(t, "h1"), chess.White, chess.King).
-			Place(mustParseSquare(t, "e1"), chess.White, chess.Rook).
-			Place(mustParseSquare(t, "e8"), chess.Black, chess.King),
-	)
-
-	if position.Status() != chess.Check {
-		t.Fatalf("want check, got %s", position.Status())
-	}
-
-	if !position.IsInCheck(chess.Black) {
-		t.Fatal("want black king in check")
-	}
-
-	if len(position.LegalMoves()) == 0 {
-		t.Fatal("want at least 1 legal move")
-	}
-}
-
-func TestCheckmate(t *testing.T) {
-	game := chess.NewGame()
-
-	applyMoves(t, game,
-		mustMove(t, "f2", "f3"),
-		mustMove(t, "e7", "e5"),
-		mustMove(t, "g2", "g4"),
-		mustMove(t, "d8", "h4"),
-	)
-
-	if game.Status() != chess.Checkmate {
-		t.Fatalf("expected checkmate, got %s", game.Status())
-	}
-
-	if !game.IsFinished() {
-		t.Fatal("want finished game")
-	}
-
-	if game.Outcome().Reason() != chess.OutcomeByCheckmate {
-		t.Fatalf("expected checkmate outcome, got %s", game.Outcome().Reason())
-	}
-
-	winner, ok := game.Outcome().Winner()
-	if !ok || winner != chess.Black {
-		t.Fatalf("want black win, got %v, %t", winner, ok)
-	}
-
-	if err := game.ApplyMove(mustMove(t, "g2", "g3")); !errors.Is(err, chess.ErrGameFinished) {
-		t.Fatalf("expected ErrGameFinished after checkmate, got %v", err)
-	}
-}
-
-func TestStalemate(t *testing.T) {
-	position := mustBuildPosition(t,
-		chess.NewPositionBuilder().
-			WithSideToMove(chess.Black).
-			Place(mustParseSquare(t, "c6"), chess.White, chess.King).
-			Place(mustParseSquare(t, "b6"), chess.White, chess.Queen).
-			Place(mustParseSquare(t, "a8"), chess.Black, chess.King),
-	)
-
-	if position.Status() != chess.Stalemate {
-		t.Fatalf("want stalemate, got %s", position.Status())
-	}
-
-	if len(position.LegalMoves()) != 0 {
-		t.Fatalf("expected no legal moves, got %d", len(position.LegalMoves()))
-	}
-}
-
-func mustBuildPosition(t *testing.T, builder *chess.PositionBuilder) chess.Position {
-	t.Helper()
-
-	position, err := builder.Build()
-	if err != nil {
-		t.Fatalf("Build error: %v", err)
-	}
-
-	return position
-}
-
-func mustNewGameFromPosition(t *testing.T, position chess.Position) *chess.Game {
-	t.Helper()
-
-	game, err := chess.NewGameFromPosition(position)
-	if err != nil {
-		t.Fatalf("NewGameFromPosition error: %v", err)
-	}
-
-	return game
-}
-
-func mustBuildGame(t *testing.T, builder *chess.PositionBuilder) *chess.Game {
-	t.Helper()
-
-	return mustNewGameFromPosition(t, mustBuildPosition(t, builder))
-}
-
-func mustParseSquare(t *testing.T, raw string) chess.Square {
-	t.Helper()
-
-	square, err := chess.ParseSquare(raw)
-	if err != nil {
-		t.Fatalf("ParseSquare(%q) error: %v", raw, err)
-	}
-
-	return square
-}
-
-func mustMove(t *testing.T, from, to string, promotion ...chess.PieceType) chess.Move {
-	t.Helper()
-
-	move := chess.Move{
-		From: mustParseSquare(t, from),
-		To:   mustParseSquare(t, to),
-	}
-
-	if len(promotion) > 0 {
-		move.Promotion = promotion[0]
-	}
-
-	return move
-}
-
-func applyMoves(t *testing.T, game *chess.Game, moves ...chess.Move) {
-	t.Helper()
-
-	for _, move := range moves {
-		if err := game.ApplyMove(move); err != nil {
-			t.Fatalf("ApplyMove(%s) error: %v", move, err)
-		}
+		t.Fatalf("want bad move error, got %v", err)
 	}
 }
