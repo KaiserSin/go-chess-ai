@@ -1,6 +1,7 @@
 package chess
 
-// Position represents a full chess position.
+import "math/bits"
+
 type Position struct {
 	board          Board
 	sideToMove     Side
@@ -10,7 +11,6 @@ type Position struct {
 	fullmoveNumber int
 }
 
-// NewInitialPosition creates the standard chess starting position.
 func NewInitialPosition() Position {
 	return Position{
 		board:          newInitialBoard(),
@@ -22,42 +22,34 @@ func NewInitialPosition() Position {
 	}
 }
 
-// PieceAt returns the piece on the target square.
 func (p Position) PieceAt(square Square) (Piece, bool) {
 	return p.board.PieceAt(square)
 }
 
-// SideToMove returns the side to move.
 func (p Position) SideToMove() Side {
 	return p.sideToMove
 }
 
-// CastlingRights returns the remaining castling rights for the position.
 func (p Position) CastlingRights() CastlingRights {
 	return p.castlingRights
 }
 
-// EnPassantSquare returns the current en passant target square, if any.
 func (p Position) EnPassantSquare() (Square, bool) {
 	return p.enPassant.value, p.enPassant.ok
 }
 
-// HalfmoveClock returns the number of halfmoves since the last pawn move or capture.
 func (p Position) HalfmoveClock() int {
 	return p.halfmoveClock
 }
 
-// FullmoveNumber returns the current fullmove number.
 func (p Position) FullmoveNumber() int {
 	return p.fullmoveNumber
 }
 
-// LegalMoves returns all legal moves for the current side.
 func (p Position) LegalMoves() []Move {
 	return p.generateLegalMoves()
 }
 
-// IsLegalMove reports whether a move is legal in the current position.
 func (p Position) IsLegalMove(move Move) bool {
 	if err := move.validateSquares(); err != nil {
 		return false
@@ -72,7 +64,6 @@ func (p Position) IsLegalMove(move Move) bool {
 	return false
 }
 
-// ApplyMove applies a legal move and returns the next position.
 func (p Position) ApplyMove(move Move) (Position, error) {
 	if err := move.validateSquares(); err != nil {
 		return Position{}, err
@@ -107,14 +98,28 @@ func (p Position) ApplyMove(move Move) (Position, error) {
 	return Position{}, ErrInvalidMove
 }
 
-// IsInCheck reports whether the given side is in check.
 func (p Position) IsInCheck(side Side) bool {
 	return p.isInCheck(side)
 }
 
-// Status returns the current play status.
 func (p Position) Status() Status {
 	return p.status()
+}
+
+func (p Position) validate() error {
+	if !p.sideToMove.isValid() {
+		return ErrInvalidPosition
+	}
+
+	if bits.OnesCount64(p.board.bitboard(White, King)) != 1 {
+		return ErrInvalidPosition
+	}
+
+	if bits.OnesCount64(p.board.bitboard(Black, King)) != 1 {
+		return ErrInvalidPosition
+	}
+
+	return nil
 }
 
 func (p Position) isInCheck(side Side) bool {
@@ -141,6 +146,29 @@ func (p Position) status() Status {
 	}
 
 	return Ongoing
+}
+
+func (p Position) isFiftyMoveDraw() bool {
+	return p.halfmoveClock >= 100
+}
+
+func (p Position) effectiveEnPassantSquare() optionalSquare {
+	if !p.enPassant.ok {
+		return noSquare()
+	}
+
+	for _, move := range p.generateLegalMoves() {
+		if move.To != p.enPassant.value || move.From.File() == move.To.File() {
+			continue
+		}
+
+		piece, ok := p.board.pieceAt(move.From)
+		if ok && piece.kind == Pawn {
+			return p.enPassant
+		}
+	}
+
+	return noSquare()
 }
 
 func validatePromotion(piece Piece, move Move) error {

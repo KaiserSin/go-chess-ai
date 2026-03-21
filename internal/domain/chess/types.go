@@ -2,7 +2,6 @@ package chess
 
 import "fmt"
 
-// Side identifies a chess side.
 type Side uint8
 
 const (
@@ -10,7 +9,6 @@ const (
 	Black
 )
 
-// Opponent returns the opposite side.
 func (s Side) Opponent() Side {
 	if s == Black {
 		return White
@@ -19,7 +17,6 @@ func (s Side) Opponent() Side {
 	return Black
 }
 
-// String returns a readable side name.
 func (s Side) String() string {
 	switch s {
 	case White:
@@ -39,7 +36,6 @@ func (s Side) index() int {
 	return int(s)
 }
 
-// PieceType identifies a chess piece type.
 type PieceType uint8
 
 const (
@@ -52,7 +48,6 @@ const (
 	King
 )
 
-// String returns a readable piece type name.
 func (pt PieceType) String() string {
 	switch pt {
 	case NoPieceType:
@@ -112,7 +107,6 @@ func (pt PieceType) symbol() string {
 
 var promotionChoices = [...]PieceType{Queen, Rook, Bishop, Knight}
 
-// Piece is a chess piece.
 type Piece struct {
 	side Side
 	kind PieceType
@@ -125,17 +119,14 @@ func newPiece(side Side, kind PieceType) Piece {
 	}
 }
 
-// Side returns the owner of the piece.
 func (p Piece) Side() Side {
 	return p.side
 }
 
-// Type returns the kind of the piece.
 func (p Piece) Type() PieceType {
 	return p.kind
 }
 
-// String returns a readable piece description.
 func (p Piece) String() string {
 	if !p.side.isValid() || !p.kind.isValid() || p.kind == NoPieceType {
 		return "empty"
@@ -144,7 +135,6 @@ func (p Piece) String() string {
 	return fmt.Sprintf("%s %s", p.side, p.kind)
 }
 
-// CastlingRights tracks which castling options remain available.
 type CastlingRights uint8
 
 const (
@@ -158,7 +148,6 @@ func initialCastlingRights() CastlingRights {
 	return WhiteKingSide | WhiteQueenSide | BlackKingSide | BlackQueenSide
 }
 
-// CanCastleKingside reports whether a side may castle kingside.
 func (c CastlingRights) CanCastleKingside(side Side) bool {
 	if side == White {
 		return c&WhiteKingSide != 0
@@ -167,7 +156,6 @@ func (c CastlingRights) CanCastleKingside(side Side) bool {
 	return c&BlackKingSide != 0
 }
 
-// CanCastleQueenside reports whether a side may castle queenside.
 func (c CastlingRights) CanCastleQueenside(side Side) bool {
 	if side == White {
 		return c&WhiteQueenSide != 0
@@ -199,7 +187,6 @@ func (c *CastlingRights) removeSide(side Side) {
 	c.removeQueenside(side)
 }
 
-// Status represents the current state of play.
 type Status uint8
 
 const (
@@ -209,7 +196,6 @@ const (
 	Stalemate
 )
 
-// String returns a readable status name.
 func (s Status) String() string {
 	switch s {
 	case Ongoing:
@@ -223,4 +209,78 @@ func (s Status) String() string {
 	default:
 		return fmt.Sprintf("status(%d)", s)
 	}
+}
+
+type OutcomeReason uint8
+
+const (
+	NoOutcomeReason OutcomeReason = iota
+	OutcomeByCheckmate
+	OutcomeByStalemate
+	OutcomeByThreefoldRepetition
+	OutcomeByFiftyMoveRule
+	OutcomeByInsufficientMaterial
+)
+
+func (r OutcomeReason) String() string {
+	switch r {
+	case NoOutcomeReason:
+		return "none"
+	case OutcomeByCheckmate:
+		return "checkmate"
+	case OutcomeByStalemate:
+		return "stalemate"
+	case OutcomeByThreefoldRepetition:
+		return "same position 3 times"
+	case OutcomeByFiftyMoveRule:
+		return "50-move rule"
+	case OutcomeByInsufficientMaterial:
+		return "not enough material"
+	default:
+		return fmt.Sprintf("outcome_reason(%d)", r)
+	}
+}
+
+type Outcome struct {
+	reason    OutcomeReason
+	winner    Side
+	hasWinner bool
+}
+
+func noOutcome() Outcome {
+	return Outcome{}
+}
+
+func decisiveOutcome(winner Side, reason OutcomeReason) Outcome {
+	return Outcome{
+		reason:    reason,
+		winner:    winner,
+		hasWinner: true,
+	}
+}
+
+func drawOutcome(reason OutcomeReason) Outcome {
+	return Outcome{
+		reason: reason,
+	}
+}
+
+func (o Outcome) Reason() OutcomeReason {
+	return o.reason
+}
+
+func (o Outcome) Winner() (Side, bool) {
+	return o.winner, o.hasWinner
+}
+
+func (o Outcome) IsFinished() bool {
+	return o.reason != NoOutcomeReason
+}
+
+func (o Outcome) IsDraw() bool {
+	return o.IsFinished() && !o.hasWinner
+}
+
+func (o Outcome) IsDecisive() bool {
+	return o.hasWinner
 }

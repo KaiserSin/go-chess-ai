@@ -1,6 +1,5 @@
 package chess
 
-// generateLegalMoves collects all legal moves for the current side.
 func (p Position) generateLegalMoves() []Move {
 	pseudoMoves := p.generatePseudoLegalMoves()
 	legalMoves := make([]Move, 0, len(pseudoMoves))

@@ -20,23 +20,23 @@ func TestKingsideCastlingMovesKingAndRook(t *testing.T) {
 
 	move := mustMove(t, "e1", "g1")
 	if !position.IsLegalMove(move) {
-		t.Fatal("expected kingside castling to be legal")
+		t.Fatal("want legal kingside castling")
 	}
 
 	next, err := position.ApplyMove(move)
 	if err != nil {
-		t.Fatalf("ApplyMove returned error: %v", err)
+		t.Fatalf("ApplyMove error: %v", err)
 	}
 
 	assertPieceAt(t, next, "g1", chess.White, chess.King)
 	assertPieceAt(t, next, "f1", chess.White, chess.Rook)
 
 	if _, ok := next.PieceAt(mustParseSquare(t, "h1")); ok {
-		t.Fatal("expected h1 to be empty after castling")
+		t.Fatal("want empty h1 after castling")
 	}
 
 	if next.CastlingRights().CanCastleKingside(chess.White) || next.CastlingRights().CanCastleQueenside(chess.White) {
-		t.Fatal("expected white castling rights to be removed")
+		t.Fatal("want no white castling rights")
 	}
 }
 
@@ -53,7 +53,7 @@ func TestQueensideCastlingBlockedByAttack(t *testing.T) {
 
 	move := mustMove(t, "e1", "c1")
 	if position.IsLegalMove(move) {
-		t.Fatal("expected queenside castling to be illegal when path is attacked")
+		t.Fatal("want illegal queenside castling")
 	}
 }
 
@@ -68,22 +68,22 @@ func TestEnPassantCaptureAndExpiration(t *testing.T) {
 
 	enPassant := mustMove(t, "e5", "d6")
 	if !game.Position().IsLegalMove(enPassant) {
-		t.Fatal("expected en passant capture to be legal")
+		t.Fatal("want legal en passant")
 	}
 
 	target, ok := game.Position().EnPassantSquare()
 	if !ok || target != mustParseSquare(t, "d6") {
-		t.Fatalf("expected en passant square d6, got %v, %t", target, ok)
+		t.Fatalf("want en passant d6, got %v, %t", target, ok)
 	}
 
 	if err := game.ApplyMove(enPassant); err != nil {
-		t.Fatalf("ApplyMove returned error: %v", err)
+		t.Fatalf("ApplyMove error: %v", err)
 	}
 
 	position := game.Position()
 	assertPieceAt(t, position, "d6", chess.White, chess.Pawn)
 	if _, ok := position.PieceAt(mustParseSquare(t, "d5")); ok {
-		t.Fatal("expected captured pawn to be removed from d5")
+		t.Fatal("want no pawn on d5")
 	}
 
 	game = chess.NewGame()
@@ -97,7 +97,7 @@ func TestEnPassantCaptureAndExpiration(t *testing.T) {
 	)
 
 	if game.Position().IsLegalMove(enPassant) {
-		t.Fatal("expected expired en passant capture to be illegal")
+		t.Fatal("want illegal en passant")
 	}
 }
 
@@ -122,7 +122,7 @@ func TestPromotionRequiresExplicitChoice(t *testing.T) {
 
 	next, err := position.ApplyMove(mustMove(t, "g7", "g8", chess.Queen))
 	if err != nil {
-		t.Fatalf("expected valid promotion, got %v", err)
+		t.Fatalf("want good promotion, got %v", err)
 	}
 
 	assertPieceAt(t, next, "g8", chess.White, chess.Queen)
@@ -138,7 +138,7 @@ func TestCastlingRightsAndMoveCountersUpdate(t *testing.T) {
 
 	position := game.Position()
 	if position.CastlingRights().CanCastleKingside(chess.White) {
-		t.Fatal("expected white kingside castling rights to be removed after rook move")
+		t.Fatal("want no white kingside castling")
 	}
 
 	if position.FullmoveNumber() != 2 {
@@ -159,7 +159,7 @@ func assertPieceAt(t *testing.T, position chess.Position, rawSquare string, side
 
 	piece, ok := position.PieceAt(mustParseSquare(t, rawSquare))
 	if !ok {
-		t.Fatalf("expected piece on %s", rawSquare)
+		t.Fatalf("want piece on %s", rawSquare)
 	}
 
 	if piece.Side() != side || piece.Type() != pieceType {

@@ -2,7 +2,6 @@ package chess
 
 import "math/bits"
 
-// Board stores piece placement using hidden bitboards.
 type Board struct {
 	pieces    [2][6]uint64
 	occupancy [2]uint64
@@ -30,7 +29,6 @@ func newInitialBoard() Board {
 	return board
 }
 
-// PieceAt returns the piece located on the given square.
 func (b Board) PieceAt(square Square) (Piece, bool) {
 	return b.pieceAt(square)
 }

@@ -1,6 +1,5 @@
 package chess
 
-// PositionBuilder creates ad-hoc valid positions without exposing internal board details.
 type PositionBuilder struct {
 	board          Board
 	sideToMove     Side
@@ -11,7 +10,6 @@ type PositionBuilder struct {
 	err            error
 }
 
-// NewPositionBuilder creates a builder for custom positions.
 func NewPositionBuilder() *PositionBuilder {
 	return &PositionBuilder{
 		board:          newEmptyBoard(),
@@ -23,7 +21,6 @@ func NewPositionBuilder() *PositionBuilder {
 	}
 }
 
-// WithSideToMove sets the side to move.
 func (b *PositionBuilder) WithSideToMove(side Side) *PositionBuilder {
 	if b.err != nil {
 		return b
@@ -38,7 +35,6 @@ func (b *PositionBuilder) WithSideToMove(side Side) *PositionBuilder {
 	return b
 }
 
-// WithCastlingRights sets the castling rights.
 func (b *PositionBuilder) WithCastlingRights(rights CastlingRights) *PositionBuilder {
 	if b.err != nil {
 		return b
@@ -48,7 +44,6 @@ func (b *PositionBuilder) WithCastlingRights(rights CastlingRights) *PositionBui
 	return b
 }
 
-// WithEnPassantSquare sets the en passant target square.
 func (b *PositionBuilder) WithEnPassantSquare(square Square) *PositionBuilder {
 	if b.err != nil {
 		return b
@@ -63,7 +58,6 @@ func (b *PositionBuilder) WithEnPassantSquare(square Square) *PositionBuilder {
 	return b
 }
 
-// WithHalfmoveClock sets the halfmove clock.
 func (b *PositionBuilder) WithHalfmoveClock(clock int) *PositionBuilder {
 	if b.err != nil {
 		return b
@@ -78,7 +72,6 @@ func (b *PositionBuilder) WithHalfmoveClock(clock int) *PositionBuilder {
 	return b
 }
 
-// WithFullmoveNumber sets the fullmove number.
 func (b *PositionBuilder) WithFullmoveNumber(number int) *PositionBuilder {
 	if b.err != nil {
 		return b
@@ -93,7 +86,6 @@ func (b *PositionBuilder) WithFullmoveNumber(number int) *PositionBuilder {
 	return b
 }
 
-// Place adds a piece to the target square.
 func (b *PositionBuilder) Place(square Square, side Side, pieceType PieceType) *PositionBuilder {
 	if b.err != nil {
 		return b
@@ -113,34 +105,23 @@ func (b *PositionBuilder) Place(square Square, side Side, pieceType PieceType) *
 	return b
 }
 
-// Build validates and returns the assembled position.
 func (b *PositionBuilder) Build() (Position, error) {
 	if b.err != nil {
 		return Position{}, b.err
 	}
 
-	if !b.sideToMove.isValid() {
-		return Position{}, ErrInvalidPosition
-	}
-
-	if b.board.bitboard(White, King) == 0 || b.board.bitboard(Black, King) == 0 {
-		return Position{}, ErrInvalidPosition
-	}
-
-	if b.board.bitboard(White, King)&(b.board.bitboard(White, King)-1) != 0 {
-		return Position{}, ErrInvalidPosition
-	}
-
-	if b.board.bitboard(Black, King)&(b.board.bitboard(Black, King)-1) != 0 {
-		return Position{}, ErrInvalidPosition
-	}
-
-	return Position{
+	position := Position{
 		board:          b.board,
 		sideToMove:     b.sideToMove,
 		castlingRights: b.castlingRights,
 		enPassant:      b.enPassant,
 		halfmoveClock:  b.halfmoveClock,
 		fullmoveNumber: b.fullmoveNumber,
-	}, nil
+	}
+
+	if err := position.validate(); err != nil {
+		return Position{}, err
+	}
+
+	return position, nil
 }

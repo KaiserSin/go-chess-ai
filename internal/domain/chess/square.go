@@ -7,10 +7,8 @@ const (
 	boardRanks = 8
 )
 
-// Square identifies a board coordinate. File and rank are zero-based.
 type Square uint8
 
-// NewSquare creates a square from zero-based file and rank.
 func NewSquare(file, rank int) (Square, error) {
 	if file < 0 || file >= boardFiles || rank < 0 || rank >= boardRanks {
 		return 0, ErrInvalidSquare
@@ -28,7 +26,6 @@ func mustSquare(file, rank int) Square {
 	return square
 }
 
-// ParseSquare parses algebraic notation such as "e4".
 func ParseSquare(raw string) (Square, error) {
 	if len(raw) != 2 {
 		return 0, ErrInvalidSquare
@@ -40,19 +37,16 @@ func ParseSquare(raw string) (Square, error) {
 	return NewSquare(file, rank)
 }
 
-// File returns the zero-based file.
 func (s Square) File() int {
 	return int(s) % boardFiles
 }
 
-// Rank returns the zero-based rank.
 func (s Square) Rank() int {
 	return int(s) / boardFiles
 }
 
 func (s Square) isValid() bool {
-	value := int(s)
-	return value >= 0 && value < boardFiles*boardRanks
+	return int(s) >= 0 && int(s) < boardFiles*boardRanks
 }
 
 func (s Square) bitboard() uint64 {
@@ -73,13 +67,16 @@ func (s Square) offset(fileDelta, rankDelta int) (Square, bool) {
 	return mustSquare(file, rank), true
 }
 
-// String formats the square as algebraic notation.
 func (s Square) String() string {
 	if !s.isValid() {
 		return "<invalid>"
 	}
 
 	return fmt.Sprintf("%c%d", 'a'+s.File(), s.Rank()+1)
+}
+
+func (s Square) color() int {
+	return (s.File() + s.Rank()) % 2
 }
 
 type optionalSquare struct {
