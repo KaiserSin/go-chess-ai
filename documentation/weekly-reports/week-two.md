@@ -23,4 +23,4 @@ Next week I want to build on top of this domain and start the `application/gamep
 | Day | Hours | Description |
 | Sunday | 3 | first chess version |
 | Saturday | 10 | all chess logics + tests |
-| TBD | TBD | Add exact hours for week two work |
+
