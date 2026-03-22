@@ -21,6 +21,7 @@ Next week I want to build on top of this domain and start the `application/gamep
 ## Time tracking
 
 | Day | Hours | Description |
+| - | - | - |
 | Sunday | 3 | first chess version |
 | Saturday | 10 | all chess logics + tests |
-
+| Total | 13 | |
