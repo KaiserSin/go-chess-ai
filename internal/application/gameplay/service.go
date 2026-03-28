@@ -47,13 +47,9 @@ func (s *Service) SelectSquare(square chess.Square) {
 	}
 
 	position := s.game.Position()
-	piece, hasPiece := position.PieceAt(square)
 
 	if !s.selectedSquare.ok {
-		if hasPiece && piece.Side() == position.SideToMove() {
-			s.selectedSquare = someSquare(square)
-		}
-
+		s.selectOwnPiece(position, square)
 		return
 	}
 
@@ -62,17 +58,13 @@ func (s *Service) SelectSquare(square chess.Square) {
 		return
 	}
 
-	if hasPiece && piece.Side() == position.SideToMove() {
-		s.selectedSquare = someSquare(square)
+	if s.selectOwnPiece(position, square) {
 		return
 	}
 
-	if s.isLegalTarget(square) {
-		_ = s.TryMove(square)
+	if err := s.TryMove(square); err != nil {
 		return
 	}
-
-	s.clearSelection()
 }
 
 func (s *Service) SelectSquareAt(file, rank int) {
@@ -98,28 +90,21 @@ func (s *Service) TryMove(to chess.Square) error {
 	}
 
 	matches := s.movesToTarget(to)
-	if len(matches) == 0 {
+	switch len(matches) {
+	case 0:
 		s.clearSelection()
 		return chess.ErrInvalidMove
-	}
-
-	if len(matches) == 1 {
-		if err := s.game.ApplyMove(matches[0]); err != nil {
-			s.clearSelection()
-			return err
+	case 1:
+		return s.applyMove(matches[0])
+	default:
+		s.pendingPromotion = &pendingPromotion{
+			from:    matches[0].From,
+			to:      matches[0].To,
+			options: orderedPromotionOptions(matches),
 		}
 
-		s.clearTransientState()
 		return nil
 	}
-
-	s.pendingPromotion = &pendingPromotion{
-		from:    matches[0].From,
-		to:      matches[0].To,
-		options: orderedPromotionOptions(matches),
-	}
-
-	return nil
 }
 
 func (s *Service) TryMoveAt(file, rank int) error {
@@ -132,26 +117,22 @@ func (s *Service) TryMoveAt(file, rank int) error {
 }
 
 func (s *Service) ChoosePromotion(pieceType chess.PieceType) error {
-	if s.pendingPromotion == nil {
+	promotion := s.pendingPromotion
+	if promotion == nil {
 		return chess.ErrInvalidMove
 	}
 
-	if !containsPromotionChoice(s.pendingPromotion.options, pieceType) {
+	if !containsPromotionChoice(promotion.options, pieceType) {
 		return chess.ErrInvalidPromotion
 	}
 
 	move := chess.Move{
-		From:      s.pendingPromotion.from,
-		To:        s.pendingPromotion.to,
+		From:      promotion.from,
+		To:        promotion.to,
 		Promotion: pieceType,
 	}
 
-	if err := s.game.ApplyMove(move); err != nil {
-		return err
-	}
-
-	s.clearTransientState()
-	return nil
+	return s.applyMove(move)
 }
 
 func (s *Service) ChoosePromotionByName(pieceType string) error {
@@ -169,7 +150,7 @@ func (s *Service) Snapshot() dto.GameSnapshot {
 	legalTargets := s.legalTargets()
 
 	snapshot := dto.GameSnapshot{
-		Squares:        make([]dto.SquareSnapshot, 0, 64),
+		Squares:        s.snapshotSquares(position, legalTargets),
 		SideToMove:     position.SideToMove().String(),
 		Status:         s.game.Status().String(),
 		OutcomeReason:  outcome.Reason().String(),
@@ -182,41 +163,7 @@ func (s *Service) Snapshot() dto.GameSnapshot {
 		snapshot.HasWinner = true
 	}
 
-	for rank := 0; rank < 8; rank++ {
-		for file := 0; file < 8; file++ {
-			square := mustSquare(file, rank)
-			squareSnapshot := dto.SquareSnapshot{
-				File:        file,
-				Rank:        rank,
-				Algebraic:   square.String(),
-				Selected:    s.selectedSquare.ok && s.selectedSquare.value == square,
-				LegalTarget: legalTargets[square],
-			}
-
-			if piece, ok := position.PieceAt(square); ok {
-				squareSnapshot.Occupied = true
-				squareSnapshot.PieceKey = pieceKey(piece)
-			}
-
-			snapshot.Squares = append(snapshot.Squares, squareSnapshot)
-		}
-	}
-
-	if s.pendingPromotion != nil {
-		snapshot.Promotion = &dto.PromotionSnapshot{
-			Visible:      true,
-			TargetSquare: s.pendingPromotion.to.String(),
-			Options:      make([]dto.PromotionOptionSnapshot, 0, len(s.pendingPromotion.options)),
-		}
-
-		side := position.SideToMove()
-		for _, option := range s.pendingPromotion.options {
-			snapshot.Promotion.Options = append(snapshot.Promotion.Options, dto.PromotionOptionSnapshot{
-				PieceType: option.String(),
-				PieceKey:  pieceKeyForSideAndType(side, option),
-			})
-		}
-	}
+	snapshot.Promotion = s.snapshotPromotion(position.SideToMove())
 
 	return snapshot
 }
@@ -251,6 +198,16 @@ func someSquare(square chess.Square) optionalSquare {
 	}
 }
 
+func (s *Service) selectOwnPiece(position chess.Position, square chess.Square) bool {
+	piece, ok := position.PieceAt(square)
+	if !ok || piece.Side() != position.SideToMove() {
+		return false
+	}
+
+	s.selectedSquare = someSquare(square)
+	return true
+}
+
 func (s *Service) clearSelection() {
 	s.selectedSquare = optionalSquare{}
 }
@@ -260,7 +217,67 @@ func (s *Service) clearTransientState() {
 	s.pendingPromotion = nil
 }
 
-func (s *Service) movesFromSelected() []chess.Move {
+func (s *Service) applyMove(move chess.Move) error {
+	if err := s.game.ApplyMove(move); err != nil {
+		s.clearSelection()
+		return err
+	}
+
+	s.clearTransientState()
+	return nil
+}
+
+func (s *Service) snapshotSquares(position chess.Position, legalTargets map[chess.Square]bool) []dto.SquareSnapshot {
+	squares := make([]dto.SquareSnapshot, 0, 64)
+	for rank := 0; rank < 8; rank++ {
+		for file := 0; file < 8; file++ {
+			squares = append(squares, s.snapshotSquare(position, legalTargets, file, rank))
+		}
+	}
+
+	return squares
+}
+
+func (s *Service) snapshotSquare(position chess.Position, legalTargets map[chess.Square]bool, file, rank int) dto.SquareSnapshot {
+	square := mustSquare(file, rank)
+	snapshot := dto.SquareSnapshot{
+		File:        file,
+		Rank:        rank,
+		Algebraic:   square.String(),
+		Selected:    s.selectedSquare.ok && s.selectedSquare.value == square,
+		LegalTarget: legalTargets[square],
+	}
+
+	if piece, ok := position.PieceAt(square); ok {
+		snapshot.Occupied = true
+		snapshot.PieceKey = pieceKey(piece)
+	}
+
+	return snapshot
+}
+
+func (s *Service) snapshotPromotion(side chess.Side) *dto.PromotionSnapshot {
+	if s.pendingPromotion == nil {
+		return nil
+	}
+
+	snapshot := &dto.PromotionSnapshot{
+		Visible:      true,
+		TargetSquare: s.pendingPromotion.to.String(),
+		Options:      make([]dto.PromotionOptionSnapshot, 0, len(s.pendingPromotion.options)),
+	}
+
+	for _, option := range s.pendingPromotion.options {
+		snapshot.Options = append(snapshot.Options, dto.PromotionOptionSnapshot{
+			PieceType: option.String(),
+			PieceKey:  pieceKeyForSideAndType(side, option),
+		})
+	}
+
+	return snapshot
+}
+
+func (s *Service) selectedMoves() []chess.Move {
 	if !s.selectedSquare.ok {
 		return nil
 	}
@@ -277,7 +294,7 @@ func (s *Service) movesFromSelected() []chess.Move {
 
 func (s *Service) movesToTarget(to chess.Square) []chess.Move {
 	matches := make([]chess.Move, 0, 4)
-	for _, move := range s.movesFromSelected() {
+	for _, move := range s.selectedMoves() {
 		if move.To == to {
 			matches = append(matches, move)
 		}
@@ -288,15 +305,11 @@ func (s *Service) movesToTarget(to chess.Square) []chess.Move {
 
 func (s *Service) legalTargets() map[chess.Square]bool {
 	targets := make(map[chess.Square]bool)
-	for _, move := range s.movesFromSelected() {
+	for _, move := range s.selectedMoves() {
 		targets[move.To] = true
 	}
 
 	return targets
-}
-
-func (s *Service) isLegalTarget(square chess.Square) bool {
-	return s.legalTargets()[square]
 }
 
 func orderedPromotionOptions(moves []chess.Move) []chess.PieceType {

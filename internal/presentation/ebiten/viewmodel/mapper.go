@@ -1,7 +1,7 @@
 package viewmodel
 
 import (
-	"fmt"
+	"strconv"
 
 	"github.com/KaiserSin/go-chess-ai/internal/application/dto"
 	boardinput "github.com/KaiserSin/go-chess-ai/internal/presentation/ebiten/input"
@@ -37,8 +37,6 @@ type SquareViewModel struct {
 
 type PieceViewModel struct {
 	Visible bool
-	CenterX int
-	CenterY int
 	Visual  theme.PieceVisual
 }
 
@@ -66,95 +64,115 @@ func NewMapper(theme theme.Theme) *Mapper {
 }
 
 func (m *Mapper) Map(snapshot dto.GameSnapshot) BoardViewModel {
-	board := BoardViewModel{
+	return BoardViewModel{
 		Title:      "Go Chess AI",
 		Status:     statusLine(snapshot),
 		BoardX:     m.theme.BoardX,
 		BoardY:     m.theme.BoardY,
 		BoardSize:  m.theme.BoardSize,
-		Squares:    make([]SquareViewModel, 0, len(snapshot.Squares)),
-		FileLabels: make([]AxisLabelViewModel, 0, 8),
-		RankLabels: make([]AxisLabelViewModel, 0, 8),
+		Squares:    m.mapSquares(snapshot.Squares),
+		FileLabels: m.fileLabels(),
+		RankLabels: m.rankLabels(),
+		Promotion:  m.mapPromotion(snapshot.Promotion),
+	}
+}
+
+func (m *Mapper) mapSquares(squares []dto.SquareSnapshot) []SquareViewModel {
+	mapped := make([]SquareViewModel, 0, len(squares))
+	for _, square := range squares {
+		mapped = append(mapped, m.mapSquare(square))
 	}
 
-	for _, square := range snapshot.Squares {
-		x := square.File * m.theme.SquareSize
-		y := (7 - square.Rank) * m.theme.SquareSize
+	return mapped
+}
 
-		squareView := SquareViewModel{
-			Algebraic:   square.Algebraic,
-			X:           x,
-			Y:           y,
-			Size:        m.theme.SquareSize,
-			IsLight:     (square.File+square.Rank)%2 != 0,
-			Selected:    square.Selected,
-			LegalTarget: square.LegalTarget,
-		}
+func (m *Mapper) mapSquare(square dto.SquareSnapshot) SquareViewModel {
+	x := square.File * m.theme.SquareSize
+	y := (7 - square.Rank) * m.theme.SquareSize
 
-		if square.Occupied {
-			squareView.Piece = PieceViewModel{
-				Visible: true,
-				CenterX: x + m.theme.SquareSize/2,
-				CenterY: y + m.theme.SquareSize/2,
-				Visual:  m.theme.PieceCatalog.Lookup(square.PieceKey),
-			}
-		}
-
-		board.Squares = append(board.Squares, squareView)
+	mapped := SquareViewModel{
+		Algebraic:   square.Algebraic,
+		X:           x,
+		Y:           y,
+		Size:        m.theme.SquareSize,
+		IsLight:     (square.File+square.Rank)%2 != 0,
+		Selected:    square.Selected,
+		LegalTarget: square.LegalTarget,
 	}
 
+	if square.Occupied {
+		mapped.Piece = PieceViewModel{
+			Visible: true,
+			Visual:  m.theme.PieceCatalog.Lookup(square.PieceKey),
+		}
+	}
+
+	return mapped
+}
+
+func (m *Mapper) fileLabels() []AxisLabelViewModel {
+	labels := make([]AxisLabelViewModel, 0, 8)
 	for file := 0; file < 8; file++ {
-		board.FileLabels = append(board.FileLabels, AxisLabelViewModel{
+		labels = append(labels, AxisLabelViewModel{
 			Text:    string(rune('a' + file)),
 			CenterX: file*m.theme.SquareSize + m.theme.SquareSize/2,
 			CenterY: m.theme.BoardSize + 22,
 		})
 	}
 
+	return labels
+}
+
+func (m *Mapper) rankLabels() []AxisLabelViewModel {
+	labels := make([]AxisLabelViewModel, 0, 8)
 	for rank := 0; rank < 8; rank++ {
-		board.RankLabels = append(board.RankLabels, AxisLabelViewModel{
-			Text:    fmt.Sprintf("%d", rank+1),
+		labels = append(labels, AxisLabelViewModel{
+			Text:    strconv.Itoa(rank + 1),
 			CenterX: -18,
 			CenterY: (7-rank)*m.theme.SquareSize + m.theme.SquareSize/2,
 		})
 	}
 
-	if snapshot.Promotion != nil && snapshot.Promotion.Visible {
-		rects := boardinput.PromotionOptionRects(m.theme, len(snapshot.Promotion.Options))
-		promotion := &PromotionViewModel{
-			Title:   "Choose promotion",
-			Options: make([]PromotionOptionViewModel, 0, len(snapshot.Promotion.Options)),
-		}
+	return labels
+}
 
-		for index, option := range snapshot.Promotion.Options {
-			rect := rects[index]
-			promotion.Options = append(promotion.Options, PromotionOptionViewModel{
-				PieceType: option.PieceType,
-				X:         rect.X,
-				Y:         rect.Y,
-				Size:      rect.Width,
-				Visual:    m.theme.PieceCatalog.Lookup(option.PieceKey),
-			})
-		}
-
-		board.Promotion = promotion
+func (m *Mapper) mapPromotion(promotion *dto.PromotionSnapshot) *PromotionViewModel {
+	if promotion == nil || !promotion.Visible {
+		return nil
 	}
 
-	return board
+	rects := boardinput.PromotionOptionRects(m.theme, len(promotion.Options))
+	mapped := &PromotionViewModel{
+		Title:   "Choose promotion",
+		Options: make([]PromotionOptionViewModel, 0, len(promotion.Options)),
+	}
+
+	for index, option := range promotion.Options {
+		rect := rects[index]
+		mapped.Options = append(mapped.Options, PromotionOptionViewModel{
+			PieceType: option.PieceType,
+			X:         rect.X,
+			Y:         rect.Y,
+			Size:      rect.Width,
+			Visual:    m.theme.PieceCatalog.Lookup(option.PieceKey),
+		})
+	}
+
+	return mapped
 }
 
 func statusLine(snapshot dto.GameSnapshot) string {
 	if snapshot.OutcomeReason != "" && snapshot.OutcomeReason != "none" {
 		if snapshot.HasWinner {
-			return fmt.Sprintf("%s won by %s", snapshot.Winner, snapshot.OutcomeReason)
+			return snapshot.Winner + " won by " + snapshot.OutcomeReason
 		}
 
-		return fmt.Sprintf("draw by %s", snapshot.OutcomeReason)
+		return "draw by " + snapshot.OutcomeReason
 	}
 
 	if snapshot.Status == "check" {
-		return fmt.Sprintf("%s to move · check", snapshot.SideToMove)
+		return snapshot.SideToMove + " to move · check"
 	}
 
-	return fmt.Sprintf("%s to move", snapshot.SideToMove)
+	return snapshot.SideToMove + " to move"
 }

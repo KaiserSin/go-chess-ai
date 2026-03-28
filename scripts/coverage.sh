@@ -4,6 +4,7 @@ set -eu
 
 ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 HTML_OUTPUT=0
+MIN_COVERAGE=90.0
 
 case "${1-}" in
 	"")
@@ -56,7 +57,17 @@ merge_set "$tmp_dir/position.cover" "$tmp_dir/position-int.cover" "$tmp_dir/posi
 
 report=$(go tool cover -func=coverage.out)
 printf '%s\n' "$report"
-printf '%s\n' "$report" | grep -Eq '^total:.*100\.0%$'
+
+total_coverage=$(printf '%s\n' "$report" | awk '/^total:/ { gsub("%", "", $NF); print $NF }')
+if [ -z "$total_coverage" ]; then
+	echo "failed to parse total coverage from go tool cover output" >&2
+	exit 1
+fi
+
+if ! awk -v actual="$total_coverage" -v minimum="$MIN_COVERAGE" 'BEGIN { exit ((actual + 0) >= (minimum + 0) ? 0 : 1) }'; then
+	echo "coverage check failed: total coverage ${total_coverage}% is below ${MIN_COVERAGE}%" >&2
+	exit 1
+fi
 
 if [ "$HTML_OUTPUT" -eq 1 ]; then
 	go tool cover -html=coverage.out -o coverage.html

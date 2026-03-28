@@ -49,13 +49,15 @@ func NewGame(service *gameplay.Service, mapper *viewmodel.Mapper, input *boardin
 }
 
 func (g *Game) Update() error {
-	g.board = g.mapper.Map(g.service.Snapshot())
+	g.refreshBoard()
 
-	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
-		mouseX, mouseY := ebiten.CursorPosition()
-		g.handleClick(mouseX, mouseY)
-		g.board = g.mapper.Map(g.service.Snapshot())
+	if !inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
+		return nil
 	}
+
+	mouseX, mouseY := ebiten.CursorPosition()
+	g.handleClick(mouseX, mouseY)
+	g.refreshBoard()
 
 	return nil
 }
@@ -115,13 +117,8 @@ func (g *Game) drawBoard(screen *ebiten.Image) {
 }
 
 func (g *Game) drawAxisLabels(screen *ebiten.Image) {
-	for _, label := range g.board.FileLabels {
-		drawCenteredText(screen, label.Text, g.labelFace, g.board.BoardX+label.CenterX, g.board.BoardY+label.CenterY, g.theme.LabelColor)
-	}
-
-	for _, label := range g.board.RankLabels {
-		drawCenteredText(screen, label.Text, g.labelFace, g.board.BoardX+label.CenterX, g.board.BoardY+label.CenterY, g.theme.LabelColor)
-	}
+	g.drawAxisLabelSet(screen, g.board.FileLabels)
+	g.drawAxisLabelSet(screen, g.board.RankLabels)
 }
 
 func (g *Game) drawPromotionOverlay(screen *ebiten.Image) {
@@ -143,17 +140,13 @@ func (g *Game) drawPromotionOverlay(screen *ebiten.Image) {
 	drawCenteredText(screen, g.board.Promotion.Title, g.statusFace, g.board.BoardX+g.board.BoardSize/2, titleY, g.theme.TitleColor)
 
 	for _, option := range g.board.Promotion.Options {
-		vector.FillRect(
-			screen,
-			float32(option.X),
-			float32(option.Y),
-			float32(option.Size),
-			float32(option.Size),
-			g.theme.PromotionButtonColor,
-			false,
-		)
-		drawRectBorder(screen, option.X, option.Y, option.Size, option.Size, 4, g.theme.PromotionButtonBorderColor)
-		g.drawPiece(screen, option.Visual, option.X, option.Y, option.Size)
+		g.drawPromotionOption(screen, option)
+	}
+}
+
+func (g *Game) drawAxisLabelSet(screen *ebiten.Image, labels []viewmodel.AxisLabelViewModel) {
+	for _, label := range labels {
+		drawCenteredText(screen, label.Text, g.labelFace, g.board.BoardX+label.CenterX, g.board.BoardY+label.CenterY, g.theme.LabelColor)
 	}
 }
 
@@ -183,19 +176,7 @@ func drawCenteredText(screen *ebiten.Image, value string, face text.Face, center
 
 func (g *Game) drawPiece(screen *ebiten.Image, visual theme.PieceVisual, x, y, size int) {
 	if sprite, ok := g.sprites.Lookup(visual.AssetKey); ok {
-		placement := spritePlacementForRect(
-			x,
-			y,
-			size,
-			sprite.Bounds().Dx(),
-			sprite.Bounds().Dy(),
-		)
-
-		var options ebiten.DrawImageOptions
-		options.GeoM.Scale(placement.ScaleX, placement.ScaleY)
-		options.GeoM.Translate(placement.X, placement.Y)
-		options.Filter = ebiten.FilterLinear
-		screen.DrawImage(sprite, &options)
+		g.drawSprite(screen, sprite, x, y, size)
 		return
 	}
 
@@ -203,6 +184,22 @@ func (g *Game) drawPiece(screen *ebiten.Image, visual theme.PieceVisual, x, y, s
 	centerY := y + size/2
 	drawCenteredText(screen, visual.Label, g.pieceFace, centerX+1, centerY+1, color.RGBA{A: 64})
 	drawCenteredText(screen, visual.Label, g.pieceFace, centerX, centerY, visual.Color)
+}
+
+func (g *Game) drawSprite(screen, sprite *ebiten.Image, x, y, size int) {
+	placement := spritePlacementForRect(
+		x,
+		y,
+		size,
+		sprite.Bounds().Dx(),
+		sprite.Bounds().Dy(),
+	)
+
+	var options ebiten.DrawImageOptions
+	options.GeoM.Scale(placement.ScaleX, placement.ScaleY)
+	options.GeoM.Translate(placement.X, placement.Y)
+	options.Filter = ebiten.FilterLinear
+	screen.DrawImage(sprite, &options)
 }
 
 type spritePlacement struct {
@@ -249,16 +246,43 @@ func drawRectBorder(screen *ebiten.Image, x, y, width, height, thickness int, cl
 	vector.FillRect(screen, float32(x+width-thickness), float32(y), float32(thickness), float32(height), clr, false)
 }
 
+func (g *Game) refreshBoard() {
+	g.board = g.mapper.Map(g.service.Snapshot())
+}
+
+func (g *Game) drawPromotionOption(screen *ebiten.Image, option viewmodel.PromotionOptionViewModel) {
+	vector.FillRect(
+		screen,
+		float32(option.X),
+		float32(option.Y),
+		float32(option.Size),
+		float32(option.Size),
+		g.theme.PromotionButtonColor,
+		false,
+	)
+	drawRectBorder(screen, option.X, option.Y, option.Size, option.Size, 4, g.theme.PromotionButtonBorderColor)
+	g.drawPiece(screen, option.Visual, option.X, option.Y, option.Size)
+}
+
 func (g *Game) handleClick(screenX, screenY int) {
 	if g.board.Promotion != nil {
-		if choice, ok := g.input.PromotionChoiceAt(screenX, screenY, g.promotionChoices()); ok {
-			_ = g.service.ChoosePromotionByName(choice)
-		}
+		g.handlePromotionClick(screenX, screenY)
 		return
 	}
 
 	if square, ok := g.input.SquareAt(screenX, screenY); ok {
 		g.service.SelectSquareAt(square.File, square.Rank)
+	}
+}
+
+func (g *Game) handlePromotionClick(screenX, screenY int) {
+	choice, ok := g.input.PromotionChoiceAt(screenX, screenY, g.promotionChoices())
+	if !ok {
+		return
+	}
+
+	if err := g.service.ChoosePromotionByName(choice); err != nil {
+		return
 	}
 }
 
