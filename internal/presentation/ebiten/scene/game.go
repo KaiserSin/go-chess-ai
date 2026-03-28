@@ -49,9 +49,9 @@ func (g *Game) Update() error {
 func (g *Game) Draw(screen *ebiten.Image) {
 	screen.Fill(g.theme.BackgroundColor)
 
-	g.drawHeader(screen)
 	g.drawBoard(screen)
 	g.drawAxisLabels(screen)
+	g.drawHeader(screen)
 }
 
 func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
@@ -60,7 +60,7 @@ func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
 
 func (g *Game) drawHeader(screen *ebiten.Image) {
 	drawTopLeftText(screen, g.board.Title, g.titleFace, g.theme.BoardX, 18, g.theme.TitleColor)
-	drawTopLeftText(screen, g.board.Status, g.statusFace, g.theme.BoardX, 44, g.theme.StatusColor)
+	drawTopLeftText(screen, g.board.Status, g.statusFace, g.theme.BoardX, 50, g.theme.StatusColor)
 }
 
 func (g *Game) drawBoard(screen *ebiten.Image) {

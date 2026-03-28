@@ -27,9 +27,9 @@ func NewTheme() Theme {
 
 	return Theme{
 		WindowWidth:      720,
-		WindowHeight:     760,
+		WindowHeight:     788,
 		BoardX:           40,
-		BoardY:           60,
+		BoardY:           88,
 		BoardSize:        640,
 		SquareSize:       80,
 		BackgroundColor:  color.RGBA{R: 22, G: 22, B: 22, A: 255},
