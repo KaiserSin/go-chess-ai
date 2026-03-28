@@ -5,6 +5,7 @@ import (
 	"image/color"
 
 	"github.com/KaiserSin/go-chess-ai/internal/application/gameplay"
+	"github.com/KaiserSin/go-chess-ai/internal/presentation/ebiten/assets"
 	"github.com/KaiserSin/go-chess-ai/internal/presentation/ebiten/theme"
 	"github.com/KaiserSin/go-chess-ai/internal/presentation/ebiten/viewmodel"
 	"github.com/hajimehoshi/ebiten/v2"
@@ -16,6 +17,7 @@ import (
 type Game struct {
 	service    *gameplay.Service
 	mapper     *viewmodel.Mapper
+	sprites    assets.PieceSprites
 	theme      theme.Theme
 	titleFace  text.Face
 	statusFace text.Face
@@ -24,7 +26,7 @@ type Game struct {
 	board      viewmodel.BoardViewModel
 }
 
-func NewGame(service *gameplay.Service, mapper *viewmodel.Mapper, uiTheme theme.Theme) (*Game, error) {
+func NewGame(service *gameplay.Service, mapper *viewmodel.Mapper, uiTheme theme.Theme, sprites assets.PieceSprites) (*Game, error) {
 	fontSource, err := text.NewGoTextFaceSource(bytes.NewReader(goregular.TTF))
 	if err != nil {
 		return nil, err
@@ -33,6 +35,7 @@ func NewGame(service *gameplay.Service, mapper *viewmodel.Mapper, uiTheme theme.
 	return &Game{
 		service:    service,
 		mapper:     mapper,
+		sprites:    sprites,
 		theme:      uiTheme,
 		titleFace:  &text.GoTextFace{Source: fontSource, Size: 24},
 		statusFace: &text.GoTextFace{Source: fontSource, Size: 18},
@@ -92,10 +95,7 @@ func (g *Game) drawBoard(screen *ebiten.Image) {
 		)
 
 		if square.Piece.Visible {
-			centerX := g.board.BoardX + square.Piece.CenterX
-			centerY := g.board.BoardY + square.Piece.CenterY
-			drawCenteredText(screen, square.Piece.Visual.Label, g.pieceFace, centerX+1, centerY+1, color.RGBA{A: 64})
-			drawCenteredText(screen, square.Piece.Visual.Label, g.pieceFace, centerX, centerY, square.Piece.Visual.Color)
+			g.drawPiece(screen, square)
 		}
 	}
 }
@@ -132,4 +132,44 @@ func drawCenteredText(screen *ebiten.Image, value string, face text.Face, center
 	options.GeoM.Translate(float64(centerX)-width/2, float64(centerY)-height/2)
 	options.ColorScale.ScaleWithColor(clr)
 	text.Draw(screen, value, face, &options)
+}
+
+func (g *Game) drawPiece(screen *ebiten.Image, square viewmodel.SquareViewModel) {
+	if sprite, ok := g.sprites.Lookup(square.Piece.Visual.AssetKey); ok {
+		placement := spritePlacementForSquare(
+			g.board.BoardX+square.X,
+			g.board.BoardY+square.Y,
+			square.Size,
+			sprite.Bounds().Dx(),
+			sprite.Bounds().Dy(),
+		)
+
+		var options ebiten.DrawImageOptions
+		options.GeoM.Scale(placement.ScaleX, placement.ScaleY)
+		options.GeoM.Translate(placement.X, placement.Y)
+		options.Filter = ebiten.FilterLinear
+		screen.DrawImage(sprite, &options)
+		return
+	}
+
+	centerX := g.board.BoardX + square.Piece.CenterX
+	centerY := g.board.BoardY + square.Piece.CenterY
+	drawCenteredText(screen, square.Piece.Visual.Label, g.pieceFace, centerX+1, centerY+1, color.RGBA{A: 64})
+	drawCenteredText(screen, square.Piece.Visual.Label, g.pieceFace, centerX, centerY, square.Piece.Visual.Color)
+}
+
+type spritePlacement struct {
+	X      float64
+	Y      float64
+	ScaleX float64
+	ScaleY float64
+}
+
+func spritePlacementForSquare(squareX, squareY, squareSize, spriteWidth, spriteHeight int) spritePlacement {
+	return spritePlacement{
+		X:      float64(squareX),
+		Y:      float64(squareY),
+		ScaleX: float64(squareSize) / float64(spriteWidth),
+		ScaleY: float64(squareSize) / float64(spriteHeight),
+	}
 }
