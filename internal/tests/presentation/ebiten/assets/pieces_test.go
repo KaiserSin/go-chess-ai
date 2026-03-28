@@ -1,9 +1,13 @@
-package assets
+package assets_test
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/KaiserSin/go-chess-ai/internal/presentation/ebiten/assets"
+)
 
 func TestLoadPieceSprites(t *testing.T) {
-	sprites := LoadPieceSprites()
+	sprites := assets.LoadPieceSprites()
 
 	if got := sprites.Count(); got != 12 {
 		t.Fatalf("want 12 sprites, got %d", got)

@@ -2,7 +2,7 @@ package scene
 
 import "testing"
 
-func TestSpritePlacementForSquare(t *testing.T) {
+func TestSpritePlacementForRect(t *testing.T) {
 	placement := spritePlacementForRect(40, 88, 80, 128, 128)
 
 	if placement.X != 40 {

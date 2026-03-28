@@ -1,13 +1,14 @@
-package input
+package input_test
 
 import (
 	"testing"
 
+	boardinput "github.com/KaiserSin/go-chess-ai/internal/presentation/ebiten/input"
 	"github.com/KaiserSin/go-chess-ai/internal/presentation/ebiten/theme"
 )
 
 func TestSquareAt(t *testing.T) {
-	translator := NewTranslator(theme.NewTheme())
+	translator := boardinput.NewTranslator(theme.NewTheme())
 
 	a1, ok := translator.SquareAt(80, 688)
 	if !ok {
@@ -29,7 +30,7 @@ func TestSquareAt(t *testing.T) {
 }
 
 func TestSquareAtOutsideBoard(t *testing.T) {
-	translator := NewTranslator(theme.NewTheme())
+	translator := boardinput.NewTranslator(theme.NewTheme())
 
 	if _, ok := translator.SquareAt(10, 10); ok {
 		t.Fatal("did not expect board hit outside board")
@@ -38,8 +39,8 @@ func TestSquareAtOutsideBoard(t *testing.T) {
 
 func TestPromotionChoiceAt(t *testing.T) {
 	uiTheme := theme.NewTheme()
-	translator := NewTranslator(uiTheme)
-	rects := PromotionOptionRects(uiTheme, 4)
+	translator := boardinput.NewTranslator(uiTheme)
+	rects := boardinput.PromotionOptionRects(uiTheme, 4)
 	pieceTypes := []string{"queen", "rook", "bishop", "knight"}
 
 	queenX := rects[0].X + rects[0].Width/2
