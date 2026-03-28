@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/KaiserSin/go-chess-ai/internal/application/dto"
+	boardinput "github.com/KaiserSin/go-chess-ai/internal/presentation/ebiten/input"
 	"github.com/KaiserSin/go-chess-ai/internal/presentation/ebiten/theme"
 )
 
@@ -20,15 +21,18 @@ type BoardViewModel struct {
 	Squares    []SquareViewModel
 	FileLabels []AxisLabelViewModel
 	RankLabels []AxisLabelViewModel
+	Promotion  *PromotionViewModel
 }
 
 type SquareViewModel struct {
-	Algebraic string
-	X         int
-	Y         int
-	Size      int
-	IsLight   bool
-	Piece     PieceViewModel
+	Algebraic   string
+	X           int
+	Y           int
+	Size        int
+	IsLight     bool
+	Selected    bool
+	LegalTarget bool
+	Piece       PieceViewModel
 }
 
 type PieceViewModel struct {
@@ -42,6 +46,19 @@ type AxisLabelViewModel struct {
 	Text    string
 	CenterX int
 	CenterY int
+}
+
+type PromotionViewModel struct {
+	Title   string
+	Options []PromotionOptionViewModel
+}
+
+type PromotionOptionViewModel struct {
+	PieceType string
+	X         int
+	Y         int
+	Size      int
+	Visual    theme.PieceVisual
 }
 
 func NewMapper(theme theme.Theme) *Mapper {
@@ -65,11 +82,13 @@ func (m *Mapper) Map(snapshot dto.GameSnapshot) BoardViewModel {
 		y := (7 - square.Rank) * m.theme.SquareSize
 
 		squareView := SquareViewModel{
-			Algebraic: square.Algebraic,
-			X:         x,
-			Y:         y,
-			Size:      m.theme.SquareSize,
-			IsLight:   (square.File+square.Rank)%2 != 0,
+			Algebraic:   square.Algebraic,
+			X:           x,
+			Y:           y,
+			Size:        m.theme.SquareSize,
+			IsLight:     (square.File+square.Rank)%2 != 0,
+			Selected:    square.Selected,
+			LegalTarget: square.LegalTarget,
 		}
 
 		if square.Occupied {
@@ -100,6 +119,27 @@ func (m *Mapper) Map(snapshot dto.GameSnapshot) BoardViewModel {
 		})
 	}
 
+	if snapshot.Promotion != nil && snapshot.Promotion.Visible {
+		rects := boardinput.PromotionOptionRects(m.theme, len(snapshot.Promotion.Options))
+		promotion := &PromotionViewModel{
+			Title:   "Choose promotion",
+			Options: make([]PromotionOptionViewModel, 0, len(snapshot.Promotion.Options)),
+		}
+
+		for index, option := range snapshot.Promotion.Options {
+			rect := rects[index]
+			promotion.Options = append(promotion.Options, PromotionOptionViewModel{
+				PieceType: option.PieceType,
+				X:         rect.X,
+				Y:         rect.Y,
+				Size:      rect.Width,
+				Visual:    m.theme.PieceCatalog.Lookup(option.PieceKey),
+			})
+		}
+
+		board.Promotion = promotion
+	}
+
 	return board
 }
 
@@ -110,6 +150,10 @@ func statusLine(snapshot dto.GameSnapshot) string {
 		}
 
 		return fmt.Sprintf("draw by %s", snapshot.OutcomeReason)
+	}
+
+	if snapshot.Status == "check" {
+		return fmt.Sprintf("%s to move · check", snapshot.SideToMove)
 	}
 
 	return fmt.Sprintf("%s to move", snapshot.SideToMove)

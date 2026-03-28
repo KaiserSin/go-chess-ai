@@ -3,7 +3,7 @@ package scene
 import "testing"
 
 func TestSpritePlacementForSquare(t *testing.T) {
-	placement := spritePlacementForSquare(40, 88, 80, 128, 128)
+	placement := spritePlacementForRect(40, 88, 80, 128, 128)
 
 	if placement.X != 40 {
 		t.Fatalf("want x 40, got %v", placement.X)

@@ -3,6 +3,7 @@ package bootstrap
 import (
 	"github.com/KaiserSin/go-chess-ai/internal/application/gameplay"
 	"github.com/KaiserSin/go-chess-ai/internal/presentation/ebiten/assets"
+	boardinput "github.com/KaiserSin/go-chess-ai/internal/presentation/ebiten/input"
 	"github.com/KaiserSin/go-chess-ai/internal/presentation/ebiten/scene"
 	"github.com/KaiserSin/go-chess-ai/internal/presentation/ebiten/theme"
 	"github.com/KaiserSin/go-chess-ai/internal/presentation/ebiten/viewmodel"
@@ -13,8 +14,9 @@ func Run() error {
 	uiTheme := theme.NewTheme()
 	service := gameplay.NewService()
 	mapper := viewmodel.NewMapper(uiTheme)
+	input := boardinput.NewTranslator(uiTheme)
 	sprites := assets.LoadPieceSprites()
-	game, err := scene.NewGame(service, mapper, uiTheme, sprites)
+	game, err := scene.NewGame(service, mapper, input, uiTheme, sprites)
 	if err != nil {
 		return err
 	}
