@@ -17,6 +17,74 @@ func TestNewGameStartsOnMenuScreen(t *testing.T) {
 	if game.screen != menuScreen {
 		t.Fatalf("want menu screen, got %d", game.screen)
 	}
+
+	if game.aiSearchDepth != defaultAISearchDepth {
+		t.Fatalf("want default ai depth %d, got %d", defaultAISearchDepth, game.aiSearchDepth)
+	}
+
+	if game.depthInput != "" {
+		t.Fatalf("want empty depth input, got %q", game.depthInput)
+	}
+
+	if !game.depthFocused {
+		t.Fatal("want depth input focused on menu start")
+	}
+}
+
+func TestDepthInputUpdatesMenuChoice(t *testing.T) {
+	game := newTestGame(t)
+	focusDepthInput(t, game)
+	game.appendDepthDigit('1')
+	game.appendDepthDigit('2')
+
+	if game.aiSearchDepth != 12 {
+		t.Fatalf("want ai depth 12, got %d", game.aiSearchDepth)
+	}
+
+	if game.depthInput != "12" {
+		t.Fatalf("want depth input 12, got %q", game.depthInput)
+	}
+}
+
+func TestDepthInputStaysEmptyAfterBlur(t *testing.T) {
+	game := newTestGame(t)
+	focusDepthInput(t, game)
+	game.deleteDepthDigit()
+	game.blurDepthInput()
+
+	if game.depthInput != "" {
+		t.Fatalf("want empty depth input after blur, got %q", game.depthInput)
+	}
+}
+
+func TestDepthInputRejectsValuesAboveTwenty(t *testing.T) {
+	game := newTestGame(t)
+	focusDepthInput(t, game)
+	game.appendDepthDigit('2')
+	game.appendDepthDigit('0')
+
+	if game.aiSearchDepth != 20 {
+		t.Fatalf("want ai depth 20, got %d", game.aiSearchDepth)
+	}
+
+	game.appendDepthDigit('1')
+
+	if game.aiSearchDepth != 20 {
+		t.Fatalf("want ai depth to stay 20, got %d", game.aiSearchDepth)
+	}
+
+	if game.depthInput != "20" {
+		t.Fatalf("want depth input 20, got %q", game.depthInput)
+	}
+}
+
+func TestEmptyDepthInputUsesDefaultDepth(t *testing.T) {
+	game := newTestGame(t)
+	clickSideChoice(t, game, "white")
+
+	if game.aiSearchDepth != defaultAISearchDepth {
+		t.Fatalf("want default ai depth %d, got %d", defaultAISearchDepth, game.aiSearchDepth)
+	}
 }
 
 func TestWhiteSelectionStartsPlayableGame(t *testing.T) {
@@ -43,7 +111,7 @@ func TestWhiteSelectionStartsPlayableGame(t *testing.T) {
 	}
 }
 
-func TestBlackSelectionBlocksBoardInputUntilAIExists(t *testing.T) {
+func TestBlackSelectionTriggersAutomaticAIMove(t *testing.T) {
 	game := newTestGame(t)
 	clickSideChoice(t, game, "black")
 
@@ -51,15 +119,25 @@ func TestBlackSelectionBlocksBoardInputUntilAIExists(t *testing.T) {
 		t.Fatalf("want player side black, got %s", game.playerSide)
 	}
 
-	if got := game.board.Status; got != "white to move · AI move not implemented yet" {
-		t.Fatalf("want ai placeholder status, got %q", got)
+	if got := game.board.Status; got != "white to move" {
+		t.Fatalf("want white turn status before ai move, got %q", got)
 	}
 
-	x, y := squareCenter(game.theme, true, 4, 6)
-	game.handleClick(x, y)
+	if err := game.updateGame(); err != nil {
+		t.Fatalf("updateGame error: %v", err)
+	}
 
-	if hasSelectedSquare(game.service.Snapshot()) {
-		t.Fatal("did not expect selection while ai turn is blocked")
+	if got := game.board.Status; got != "black to move" {
+		t.Fatalf("want black turn status after ai move, got %q", got)
+	}
+
+	snapshot := game.service.Snapshot()
+	if square := squareByAlgebraic(t, snapshot, "a3"); square.PieceKey != "white-pawn" {
+		t.Fatalf("want white-pawn on a3, got %q", square.PieceKey)
+	}
+
+	if square := squareByAlgebraic(t, snapshot, "a2"); square.Occupied {
+		t.Fatal("did not expect piece on a2 after ai move")
 	}
 }
 
@@ -96,6 +174,13 @@ func clickSideChoice(t *testing.T, game *Game, side string) {
 	t.Fatalf("side choice %q not found", side)
 }
 
+func focusDepthInput(t *testing.T, game *Game) {
+	t.Helper()
+
+	rect := boardinput.DepthInputRect(game.theme.WindowWidth)
+	game.handleMenuClick(rect.X+rect.Width/2, rect.Y+rect.Height/2)
+}
+
 func squareCenter(uiTheme theme.Theme, blackPerspective bool, file, rank int) (int, int) {
 	column := file
 	row := 7 - rank
@@ -126,4 +211,17 @@ func hasSelectedSquare(snapshot dto.GameSnapshot) bool {
 	}
 
 	return false
+}
+
+func squareByAlgebraic(t *testing.T, snapshot dto.GameSnapshot, algebraic string) dto.SquareSnapshot {
+	t.Helper()
+
+	for _, square := range snapshot.Squares {
+		if square.Algebraic == algebraic {
+			return square
+		}
+	}
+
+	t.Fatalf("square %q not found", algebraic)
+	return dto.SquareSnapshot{}
 }

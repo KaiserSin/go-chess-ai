@@ -3,15 +3,19 @@ package gameplay
 import (
 	"strings"
 
+	"github.com/KaiserSin/go-chess-ai/internal/application/ai"
 	chess "github.com/KaiserSin/go-chess-ai/internal/domain/chess"
 
 	"github.com/KaiserSin/go-chess-ai/internal/application/dto"
 )
 
+const defaultAISearchDepth = 2
+
 type Service struct {
 	game             *chess.Game
 	selectedSquare   optionalSquare
 	pendingPromotion *pendingPromotion
+	aiSearchDepth    int
 }
 
 type optionalSquare struct {
@@ -26,7 +30,9 @@ type pendingPromotion struct {
 }
 
 func NewService() *Service {
-	service := &Service{}
+	service := &Service{
+		aiSearchDepth: defaultAISearchDepth,
+	}
 	service.NewGame()
 	return service
 }
@@ -144,6 +150,32 @@ func (s *Service) ChoosePromotionByName(pieceType string) error {
 	return s.ChoosePromotion(promotion)
 }
 
+func (s *Service) SetAISearchDepth(depth int) {
+	if depth <= 0 {
+		s.aiSearchDepth = defaultAISearchDepth
+		return
+	}
+
+	s.aiSearchDepth = depth
+}
+
+func (s *Service) ApplyAIMove() error {
+	if s.game.IsFinished() {
+		return chess.ErrGameFinished
+	}
+
+	if s.pendingPromotion != nil {
+		return chess.ErrInvalidMove
+	}
+
+	result := ai.BestMove(s.game.Position(), s.aiSearchDepth)
+	if !result.HasMove {
+		return chess.ErrGameFinished
+	}
+
+	return s.applyMove(result.Move)
+}
+
 func (s *Service) Snapshot() dto.GameSnapshot {
 	position := s.game.Position()
 	outcome := s.game.Outcome()
@@ -170,7 +202,8 @@ func (s *Service) Snapshot() dto.GameSnapshot {
 
 func newServiceWithGame(game *chess.Game) *Service {
 	return &Service{
-		game: game,
+		game:          game,
+		aiSearchDepth: defaultAISearchDepth,
 	}
 }
 

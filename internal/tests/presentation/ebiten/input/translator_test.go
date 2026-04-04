@@ -121,3 +121,20 @@ func TestSideChoiceAt(t *testing.T) {
 		t.Fatalf("want black, got %s", choice)
 	}
 }
+
+func TestDepthInputAt(t *testing.T) {
+	uiTheme := theme.NewTheme()
+	translator := boardinput.NewTranslator(uiTheme)
+
+	rect := boardinput.DepthInputRect(uiTheme.WindowWidth)
+	centerX := rect.X + rect.Width/2
+	centerY := rect.Y + rect.Height/2
+
+	if !translator.DepthInputAt(centerX, centerY) {
+		t.Fatal("want depth input hit")
+	}
+
+	if translator.DepthInputAt(10, 10) {
+		t.Fatal("did not expect depth input hit outside field")
+	}
+}

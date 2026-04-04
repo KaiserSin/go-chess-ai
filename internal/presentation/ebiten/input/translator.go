@@ -78,6 +78,10 @@ func (t *Translator) SideChoiceAt(screenX, screenY int) (string, bool) {
 	return "", false
 }
 
+func (t *Translator) DepthInputAt(screenX, screenY int) bool {
+	return DepthInputRect(t.theme.WindowWidth).Contains(screenX, screenY)
+}
+
 func PromotionOptionRects(theme theme.Theme, optionCount int) []Rect {
 	if optionCount <= 0 {
 		return nil
@@ -102,11 +106,23 @@ func PromotionOptionRects(theme theme.Theme, optionCount int) []Rect {
 }
 
 const (
+	depthInputWidth  = 220
+	depthInputHeight = 52
+	depthInputStartY = 260
 	sideChoiceWidth  = 260
 	sideChoiceHeight = 56
 	sideChoiceGap    = 16
-	sideChoiceStartY = 300
+	sideChoiceStartY = 396
 )
+
+func DepthInputRect(windowWidth int) Rect {
+	return Rect{
+		X:      (windowWidth - depthInputWidth) / 2,
+		Y:      depthInputStartY,
+		Width:  depthInputWidth,
+		Height: depthInputHeight,
+	}
+}
 
 func SideChoiceRects(windowWidth int) []SideChoice {
 	choices := []SideChoice{

@@ -3,6 +3,7 @@ package scene
 import (
 	"bytes"
 	"image/color"
+	"strconv"
 
 	"github.com/KaiserSin/go-chess-ai/internal/application/gameplay"
 	"github.com/KaiserSin/go-chess-ai/internal/presentation/ebiten/assets"
@@ -24,24 +25,33 @@ const (
 )
 
 const (
-	menuTitleY      = 170
-	menuSubtitleY   = 220
-	menuBorderWidth = 2
+	defaultAISearchDepth = 2
+	menuTitleY           = 150
+	menuDepthLabelY      = 220
+	menuDepthHintY       = 328
+	menuSideLabelY       = 356
+	menuBorderWidth      = 2
+	maxAISearchDepth     = 20
+	menuInputPaddingX    = 14
+	menuInputPaddingY    = 13
 )
 
 type Game struct {
-	service    *gameplay.Service
-	mapper     *viewmodel.Mapper
-	input      *boardinput.Translator
-	sprites    assets.PieceSprites
-	theme      theme.Theme
-	titleFace  text.Face
-	statusFace text.Face
-	labelFace  text.Face
-	pieceFace  text.Face
-	screen     screenState
-	playerSide string
-	board      viewmodel.BoardViewModel
+	service       *gameplay.Service
+	mapper        *viewmodel.Mapper
+	input         *boardinput.Translator
+	sprites       assets.PieceSprites
+	theme         theme.Theme
+	titleFace     text.Face
+	statusFace    text.Face
+	labelFace     text.Face
+	pieceFace     text.Face
+	screen        screenState
+	playerSide    string
+	aiSearchDepth int
+	depthInput    string
+	depthFocused  bool
+	board         viewmodel.BoardViewModel
 }
 
 func NewGame(service *gameplay.Service, mapper *viewmodel.Mapper, input *boardinput.Translator, uiTheme theme.Theme, sprites assets.PieceSprites) (*Game, error) {
@@ -51,16 +61,19 @@ func NewGame(service *gameplay.Service, mapper *viewmodel.Mapper, input *boardin
 	}
 
 	return &Game{
-		service:    service,
-		mapper:     mapper,
-		input:      input,
-		sprites:    sprites,
-		theme:      uiTheme,
-		screen:     menuScreen,
-		titleFace:  &text.GoTextFace{Source: fontSource, Size: 24},
-		statusFace: &text.GoTextFace{Source: fontSource, Size: 18},
-		labelFace:  &text.GoTextFace{Source: fontSource, Size: 18},
-		pieceFace:  &text.GoTextFace{Source: fontSource, Size: 42},
+		service:       service,
+		mapper:        mapper,
+		input:         input,
+		sprites:       sprites,
+		theme:         uiTheme,
+		screen:        menuScreen,
+		aiSearchDepth: defaultAISearchDepth,
+		depthInput:    "",
+		depthFocused:  true,
+		titleFace:     &text.GoTextFace{Source: fontSource, Size: 24},
+		statusFace:    &text.GoTextFace{Source: fontSource, Size: 18},
+		labelFace:     &text.GoTextFace{Source: fontSource, Size: 18},
+		pieceFace:     &text.GoTextFace{Source: fontSource, Size: 42},
 	}, nil
 }
 
@@ -97,7 +110,44 @@ func (g *Game) drawHeader(screen *ebiten.Image) {
 
 func (g *Game) drawMenu(screen *ebiten.Image) {
 	drawCenteredText(screen, "Go Chess AI", g.titleFace, g.theme.WindowWidth/2, menuTitleY, g.theme.TitleColor)
-	drawCenteredText(screen, "Choose your side", g.statusFace, g.theme.WindowWidth/2, menuSubtitleY, g.theme.StatusColor)
+	drawCenteredText(screen, "Choose depth", g.statusFace, g.theme.WindowWidth/2, menuDepthLabelY, g.theme.StatusColor)
+
+	depthRect := boardinput.DepthInputRect(g.theme.WindowWidth)
+	vector.FillRect(
+		screen,
+		float32(depthRect.X),
+		float32(depthRect.Y),
+		float32(depthRect.Width),
+		float32(depthRect.Height),
+		color.RGBA{R: 28, G: 28, B: 28, A: 255},
+		false,
+	)
+
+	depthBorderColor := g.theme.BorderColor
+	if g.depthFocused {
+		depthBorderColor = g.theme.SelectedSquareColor
+	}
+	drawRectBorder(
+		screen,
+		depthRect.X,
+		depthRect.Y,
+		depthRect.Width,
+		depthRect.Height,
+		menuBorderWidth,
+		depthBorderColor,
+	)
+
+	drawTopLeftText(
+		screen,
+		g.depthFieldDisplay(),
+		g.labelFace,
+		depthRect.X+menuInputPaddingX,
+		depthRect.Y+menuInputPaddingY,
+		g.theme.LabelColor,
+	)
+	drawCenteredText(screen, "Type a number from 1 to 20", g.labelFace, g.theme.WindowWidth/2, menuDepthHintY, g.theme.LabelColor)
+
+	drawCenteredText(screen, "Choose your side", g.statusFace, g.theme.WindowWidth/2, menuSideLabelY, g.theme.StatusColor)
 
 	for _, choice := range boardinput.SideChoiceRects(g.theme.WindowWidth) {
 		drawRectBorder(
@@ -300,9 +350,6 @@ func (g *Game) refreshBoard() {
 
 	snapshot := g.service.Snapshot()
 	g.board = g.mapper.Map(snapshot, g.blackPerspective())
-	if g.isAITurn(snapshot.SideToMove, snapshot.OutcomeReason) {
-		g.board.Status += " · AI move not implemented yet"
-	}
 }
 
 func (g *Game) drawPromotionOption(screen *ebiten.Image, option viewmodel.PromotionOptionViewModel) {
@@ -336,6 +383,13 @@ func (g *Game) handleClick(screenX, screenY int) {
 }
 
 func (g *Game) handleMenuClick(screenX, screenY int) {
+	if g.input.DepthInputAt(screenX, screenY) {
+		g.focusDepthInput()
+		return
+	}
+
+	g.blurDepthInput()
+
 	side, ok := g.input.SideChoiceAt(screenX, screenY)
 	if !ok {
 		return
@@ -373,7 +427,9 @@ func (g *Game) startGameAs(side string) {
 		side = "white"
 	}
 
+	g.aiSearchDepth = g.menuSearchDepth()
 	g.playerSide = side
+	g.service.SetAISearchDepth(g.aiSearchDepth)
 	g.service.NewGame()
 	g.screen = playingScreen
 	g.refreshBoard()
@@ -392,6 +448,8 @@ func (g *Game) isAITurn(sideToMove, outcomeReason string) bool {
 }
 
 func (g *Game) updateMenu() error {
+	g.handleMenuKeyboardInput()
+
 	if !inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
 		return nil
 	}
@@ -402,8 +460,67 @@ func (g *Game) updateMenu() error {
 	return nil
 }
 
+func (g *Game) handleMenuKeyboardInput() {
+	if !g.depthFocused {
+		return
+	}
+
+	if digit, ok := menuDigitKeyJustPressed(); ok {
+		g.appendDepthDigit(digit)
+	}
+
+	if inpututil.IsKeyJustPressed(ebiten.KeyBackspace) {
+		g.deleteDepthDigit()
+	}
+}
+
+func (g *Game) appendDepthDigit(inputRune rune) {
+	if inputRune < '0' || inputRune > '9' {
+		return
+	}
+
+	next := g.depthInput + string(inputRune)
+	depth, ok := parseDepthInput(next)
+	if !ok {
+		return
+	}
+
+	g.depthInput = next
+	g.aiSearchDepth = depth
+}
+
+func (g *Game) deleteDepthDigit() {
+	if g.depthInput == "" {
+		return
+	}
+
+	g.depthInput = g.depthInput[:len(g.depthInput)-1]
+
+	if depth, ok := parseDepthInput(g.depthInput); ok {
+		g.aiSearchDepth = depth
+	}
+}
+
+func (g *Game) menuSearchDepth() int {
+	depth, ok := parseDepthInput(g.depthInput)
+	if !ok {
+		return defaultAISearchDepth
+	}
+
+	return depth
+}
+
 func (g *Game) updateGame() error {
 	g.refreshBoard()
+	snapshot := g.service.Snapshot()
+	if g.isAITurn(snapshot.SideToMove, snapshot.OutcomeReason) {
+		if err := g.service.ApplyAIMove(); err != nil {
+			return err
+		}
+
+		g.refreshBoard()
+		return nil
+	}
 
 	if !inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
 		return nil
@@ -426,4 +543,52 @@ func opponentSide(side string) string {
 
 func gameFinished(outcomeReason string) bool {
 	return outcomeReason != "" && outcomeReason != "none"
+}
+
+func parseDepthInput(value string) (int, bool) {
+	if value == "" {
+		return 0, false
+	}
+
+	depth, err := strconv.Atoi(value)
+	if err != nil || depth < 1 || depth > maxAISearchDepth {
+		return 0, false
+	}
+
+	return depth, true
+}
+
+func (g *Game) focusDepthInput() {
+	g.depthFocused = true
+}
+
+func (g *Game) blurDepthInput() {
+	g.depthFocused = false
+}
+
+func (g *Game) depthFieldDisplay() string {
+	value := g.depthInput
+	if !g.depthFocused || !caretVisible() {
+		return value
+	}
+
+	return value + "|"
+}
+
+func caretVisible() bool {
+	return ebiten.Tick()/30%2 == 0
+}
+
+func menuDigitKeyJustPressed() (rune, bool) {
+	for digit := 0; digit <= 9; digit++ {
+		if inpututil.IsKeyJustPressed(ebiten.KeyDigit0 + ebiten.Key(digit)) {
+			return rune('0' + digit), true
+		}
+
+		if inpututil.IsKeyJustPressed(ebiten.KeyNumpad0 + ebiten.Key(digit)) {
+			return rune('0' + digit), true
+		}
+	}
+
+	return 0, false
 }
