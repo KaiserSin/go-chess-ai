@@ -22,7 +22,7 @@ func TestMapperPromotionOverlayOrderAndPosition(t *testing.T) {
 				{PieceType: "knight", PieceKey: "white-knight"},
 			},
 		},
-	})
+	}, false)
 
 	if board.Promotion == nil {
 		t.Fatal("want promotion overlay")

@@ -15,6 +15,12 @@ type SquareTarget struct {
 	Rank int
 }
 
+type SideChoice struct {
+	Side  string
+	Label string
+	Rect  Rect
+}
+
 type Rect struct {
 	X      int
 	Y      int
@@ -26,7 +32,7 @@ func NewTranslator(theme theme.Theme) *Translator {
 	return &Translator{theme: theme}
 }
 
-func (t *Translator) SquareAt(screenX, screenY int) (SquareTarget, bool) {
+func (t *Translator) SquareAt(screenX, screenY int, blackPerspective bool) (SquareTarget, bool) {
 	if screenX < t.theme.BoardX || screenX >= t.theme.BoardX+t.theme.BoardSize {
 		return SquareTarget{}, false
 	}
@@ -35,12 +41,19 @@ func (t *Translator) SquareAt(screenX, screenY int) (SquareTarget, bool) {
 		return SquareTarget{}, false
 	}
 
-	file := (screenX - t.theme.BoardX) / t.theme.SquareSize
-	rank := 7 - (screenY-t.theme.BoardY)/t.theme.SquareSize
+	column := (screenX - t.theme.BoardX) / t.theme.SquareSize
+	row := (screenY - t.theme.BoardY) / t.theme.SquareSize
+
+	if blackPerspective {
+		return SquareTarget{
+			File: 7 - column,
+			Rank: row,
+		}, true
+	}
 
 	return SquareTarget{
-		File: file,
-		Rank: rank,
+		File: column,
+		Rank: 7 - row,
 	}, true
 }
 
@@ -49,6 +62,16 @@ func (t *Translator) PromotionChoiceAt(screenX, screenY int, pieceTypes []string
 	for index, rect := range rects {
 		if rect.Contains(screenX, screenY) {
 			return pieceTypes[index], true
+		}
+	}
+
+	return "", false
+}
+
+func (t *Translator) SideChoiceAt(screenX, screenY int) (string, bool) {
+	for _, choice := range SideChoiceRects(t.theme.WindowWidth) {
+		if choice.Rect.Contains(screenX, screenY) {
+			return choice.Side, true
 		}
 	}
 
@@ -76,6 +99,39 @@ func PromotionOptionRects(theme theme.Theme, optionCount int) []Rect {
 	}
 
 	return rects
+}
+
+const (
+	sideChoiceWidth  = 260
+	sideChoiceHeight = 56
+	sideChoiceGap    = 16
+	sideChoiceStartY = 300
+)
+
+func SideChoiceRects(windowWidth int) []SideChoice {
+	choices := []SideChoice{
+		{
+			Side:  "white",
+			Label: "Play as White",
+		},
+		{
+			Side:  "black",
+			Label: "Play as Black",
+		},
+	}
+
+	startX := (windowWidth - sideChoiceWidth) / 2
+
+	for index := range choices {
+		choices[index].Rect = Rect{
+			X:      startX,
+			Y:      sideChoiceStartY + index*(sideChoiceHeight+sideChoiceGap),
+			Width:  sideChoiceWidth,
+			Height: sideChoiceHeight,
+		}
+	}
+
+	return choices
 }
 
 func (s SquareTarget) Algebraic() string {

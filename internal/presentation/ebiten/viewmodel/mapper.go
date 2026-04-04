@@ -63,32 +63,31 @@ func NewMapper(theme theme.Theme) *Mapper {
 	return &Mapper{theme: theme}
 }
 
-func (m *Mapper) Map(snapshot dto.GameSnapshot) BoardViewModel {
+func (m *Mapper) Map(snapshot dto.GameSnapshot, blackPerspective bool) BoardViewModel {
 	return BoardViewModel{
 		Title:      "Go Chess AI",
 		Status:     statusLine(snapshot),
 		BoardX:     m.theme.BoardX,
 		BoardY:     m.theme.BoardY,
 		BoardSize:  m.theme.BoardSize,
-		Squares:    m.mapSquares(snapshot.Squares),
-		FileLabels: m.fileLabels(),
-		RankLabels: m.rankLabels(),
+		Squares:    m.mapSquares(snapshot.Squares, blackPerspective),
+		FileLabels: m.fileLabels(blackPerspective),
+		RankLabels: m.rankLabels(blackPerspective),
 		Promotion:  m.mapPromotion(snapshot.Promotion),
 	}
 }
 
-func (m *Mapper) mapSquares(squares []dto.SquareSnapshot) []SquareViewModel {
+func (m *Mapper) mapSquares(squares []dto.SquareSnapshot, blackPerspective bool) []SquareViewModel {
 	mapped := make([]SquareViewModel, 0, len(squares))
 	for _, square := range squares {
-		mapped = append(mapped, m.mapSquare(square))
+		mapped = append(mapped, m.mapSquare(square, blackPerspective))
 	}
 
 	return mapped
 }
 
-func (m *Mapper) mapSquare(square dto.SquareSnapshot) SquareViewModel {
-	x := square.File * m.theme.SquareSize
-	y := (7 - square.Rank) * m.theme.SquareSize
+func (m *Mapper) mapSquare(square dto.SquareSnapshot, blackPerspective bool) SquareViewModel {
+	x, y := m.squarePosition(square.File, square.Rank, blackPerspective)
 
 	mapped := SquareViewModel{
 		Algebraic:   square.Algebraic,
@@ -110,12 +109,17 @@ func (m *Mapper) mapSquare(square dto.SquareSnapshot) SquareViewModel {
 	return mapped
 }
 
-func (m *Mapper) fileLabels() []AxisLabelViewModel {
+func (m *Mapper) fileLabels(blackPerspective bool) []AxisLabelViewModel {
 	labels := make([]AxisLabelViewModel, 0, 8)
-	for file := 0; file < 8; file++ {
+	for column := 0; column < 8; column++ {
+		label := string(rune('a' + column))
+		if blackPerspective {
+			label = string(rune('h' - column))
+		}
+
 		labels = append(labels, AxisLabelViewModel{
-			Text:    string(rune('a' + file)),
-			CenterX: file*m.theme.SquareSize + m.theme.SquareSize/2,
+			Text:    label,
+			CenterX: column*m.theme.SquareSize + m.theme.SquareSize/2,
 			CenterY: m.theme.BoardSize + 22,
 		})
 	}
@@ -123,13 +127,18 @@ func (m *Mapper) fileLabels() []AxisLabelViewModel {
 	return labels
 }
 
-func (m *Mapper) rankLabels() []AxisLabelViewModel {
+func (m *Mapper) rankLabels(blackPerspective bool) []AxisLabelViewModel {
 	labels := make([]AxisLabelViewModel, 0, 8)
-	for rank := 0; rank < 8; rank++ {
+	for row := 0; row < 8; row++ {
+		label := strconv.Itoa(8 - row)
+		if blackPerspective {
+			label = strconv.Itoa(row + 1)
+		}
+
 		labels = append(labels, AxisLabelViewModel{
-			Text:    strconv.Itoa(rank + 1),
+			Text:    label,
 			CenterX: -18,
-			CenterY: (7-rank)*m.theme.SquareSize + m.theme.SquareSize/2,
+			CenterY: row*m.theme.SquareSize + m.theme.SquareSize/2,
 		})
 	}
 
@@ -175,4 +184,12 @@ func statusLine(snapshot dto.GameSnapshot) string {
 	}
 
 	return snapshot.SideToMove + " to move"
+}
+
+func (m *Mapper) squarePosition(file, rank int, blackPerspective bool) (int, int) {
+	if blackPerspective {
+		return (7 - file) * m.theme.SquareSize, rank * m.theme.SquareSize
+	}
+
+	return file * m.theme.SquareSize, (7 - rank) * m.theme.SquareSize
 }

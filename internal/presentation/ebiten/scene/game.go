@@ -16,6 +16,19 @@ import (
 	"golang.org/x/image/font/gofont/goregular"
 )
 
+type screenState uint8
+
+const (
+	menuScreen screenState = iota
+	playingScreen
+)
+
+const (
+	menuTitleY      = 170
+	menuSubtitleY   = 220
+	menuBorderWidth = 2
+)
+
 type Game struct {
 	service    *gameplay.Service
 	mapper     *viewmodel.Mapper
@@ -26,6 +39,8 @@ type Game struct {
 	statusFace text.Face
 	labelFace  text.Face
 	pieceFace  text.Face
+	screen     screenState
+	playerSide string
 	board      viewmodel.BoardViewModel
 }
 
@@ -41,6 +56,7 @@ func NewGame(service *gameplay.Service, mapper *viewmodel.Mapper, input *boardin
 		input:      input,
 		sprites:    sprites,
 		theme:      uiTheme,
+		screen:     menuScreen,
 		titleFace:  &text.GoTextFace{Source: fontSource, Size: 24},
 		statusFace: &text.GoTextFace{Source: fontSource, Size: 18},
 		labelFace:  &text.GoTextFace{Source: fontSource, Size: 18},
@@ -49,21 +65,20 @@ func NewGame(service *gameplay.Service, mapper *viewmodel.Mapper, input *boardin
 }
 
 func (g *Game) Update() error {
-	g.refreshBoard()
-
-	if !inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
-		return nil
+	if g.screen == menuScreen {
+		return g.updateMenu()
 	}
 
-	mouseX, mouseY := ebiten.CursorPosition()
-	g.handleClick(mouseX, mouseY)
-	g.refreshBoard()
-
-	return nil
+	return g.updateGame()
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
 	screen.Fill(g.theme.BackgroundColor)
+
+	if g.screen == menuScreen {
+		g.drawMenu(screen)
+		return
+	}
 
 	g.drawBoard(screen)
 	g.drawPromotionOverlay(screen)
@@ -78,6 +93,31 @@ func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
 func (g *Game) drawHeader(screen *ebiten.Image) {
 	drawTopLeftText(screen, g.board.Title, g.titleFace, g.theme.BoardX, 18, g.theme.TitleColor)
 	drawTopLeftText(screen, g.board.Status, g.statusFace, g.theme.BoardX, 50, g.theme.StatusColor)
+}
+
+func (g *Game) drawMenu(screen *ebiten.Image) {
+	drawCenteredText(screen, "Go Chess AI", g.titleFace, g.theme.WindowWidth/2, menuTitleY, g.theme.TitleColor)
+	drawCenteredText(screen, "Choose your side", g.statusFace, g.theme.WindowWidth/2, menuSubtitleY, g.theme.StatusColor)
+
+	for _, choice := range boardinput.SideChoiceRects(g.theme.WindowWidth) {
+		drawRectBorder(
+			screen,
+			choice.Rect.X,
+			choice.Rect.Y,
+			choice.Rect.Width,
+			choice.Rect.Height,
+			menuBorderWidth,
+			g.theme.BorderColor,
+		)
+		drawCenteredText(
+			screen,
+			choice.Label,
+			g.labelFace,
+			choice.Rect.X+choice.Rect.Width/2,
+			choice.Rect.Y+choice.Rect.Height/2,
+			g.theme.LabelColor,
+		)
+	}
 }
 
 func (g *Game) drawBoard(screen *ebiten.Image) {
@@ -209,6 +249,12 @@ type spritePlacement struct {
 	ScaleY float64
 }
 
+type targetDotPlacement struct {
+	CenterX float32
+	CenterY float32
+	Radius  float32
+}
+
 func spritePlacementForRect(squareX, squareY, squareSize, spriteWidth, spriteHeight int) spritePlacement {
 	return spritePlacement{
 		X:      float64(squareX),
@@ -223,15 +269,8 @@ func (g *Game) drawSquareState(screen *ebiten.Image, square viewmodel.SquareView
 	y := g.board.BoardY + square.Y
 
 	if square.LegalTarget {
-		vector.FillRect(
-			screen,
-			float32(x),
-			float32(y),
-			float32(square.Size),
-			float32(square.Size),
-			g.theme.LegalTargetColor,
-			false,
-		)
+		dot := targetDotForSquare(x, y, square.Size)
+		vector.FillCircle(screen, dot.CenterX, dot.CenterY, dot.Radius, g.theme.SelectedSquareColor, false)
 	}
 
 	if square.Selected {
@@ -246,8 +285,24 @@ func drawRectBorder(screen *ebiten.Image, x, y, width, height, thickness int, cl
 	vector.FillRect(screen, float32(x+width-thickness), float32(y), float32(thickness), float32(height), clr, false)
 }
 
+func targetDotForSquare(squareX, squareY, squareSize int) targetDotPlacement {
+	return targetDotPlacement{
+		CenterX: float32(squareX + squareSize/2),
+		CenterY: float32(squareY + squareSize/2),
+		Radius:  float32(squareSize) / 8,
+	}
+}
+
 func (g *Game) refreshBoard() {
-	g.board = g.mapper.Map(g.service.Snapshot())
+	if g.screen != playingScreen {
+		return
+	}
+
+	snapshot := g.service.Snapshot()
+	g.board = g.mapper.Map(snapshot, g.blackPerspective())
+	if g.isAITurn(snapshot.SideToMove, snapshot.OutcomeReason) {
+		g.board.Status += " · AI move not implemented yet"
+	}
 }
 
 func (g *Game) drawPromotionOption(screen *ebiten.Image, option viewmodel.PromotionOptionViewModel) {
@@ -265,14 +320,28 @@ func (g *Game) drawPromotionOption(screen *ebiten.Image, option viewmodel.Promot
 }
 
 func (g *Game) handleClick(screenX, screenY int) {
+	snapshot := g.service.Snapshot()
+	if g.isAITurn(snapshot.SideToMove, snapshot.OutcomeReason) {
+		return
+	}
+
 	if g.board.Promotion != nil {
 		g.handlePromotionClick(screenX, screenY)
 		return
 	}
 
-	if square, ok := g.input.SquareAt(screenX, screenY); ok {
+	if square, ok := g.input.SquareAt(screenX, screenY, g.blackPerspective()); ok {
 		g.service.SelectSquareAt(square.File, square.Rank)
 	}
+}
+
+func (g *Game) handleMenuClick(screenX, screenY int) {
+	side, ok := g.input.SideChoiceAt(screenX, screenY)
+	if !ok {
+		return
+	}
+
+	g.startGameAs(side)
 }
 
 func (g *Game) handlePromotionClick(screenX, screenY int) {
@@ -297,4 +366,64 @@ func (g *Game) promotionChoices() []string {
 	}
 
 	return choices
+}
+
+func (g *Game) startGameAs(side string) {
+	if side != "black" {
+		side = "white"
+	}
+
+	g.playerSide = side
+	g.service.NewGame()
+	g.screen = playingScreen
+	g.refreshBoard()
+}
+
+func (g *Game) blackPerspective() bool {
+	return g.playerSide == "black"
+}
+
+func (g *Game) isAITurn(sideToMove, outcomeReason string) bool {
+	if g.screen != playingScreen || g.playerSide == "" || gameFinished(outcomeReason) {
+		return false
+	}
+
+	return sideToMove == opponentSide(g.playerSide)
+}
+
+func (g *Game) updateMenu() error {
+	if !inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
+		return nil
+	}
+
+	mouseX, mouseY := ebiten.CursorPosition()
+	g.handleMenuClick(mouseX, mouseY)
+
+	return nil
+}
+
+func (g *Game) updateGame() error {
+	g.refreshBoard()
+
+	if !inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
+		return nil
+	}
+
+	mouseX, mouseY := ebiten.CursorPosition()
+	g.handleClick(mouseX, mouseY)
+	g.refreshBoard()
+
+	return nil
+}
+
+func opponentSide(side string) string {
+	if side == "black" {
+		return "white"
+	}
+
+	return "black"
+}
+
+func gameFinished(outcomeReason string) bool {
+	return outcomeReason != "" && outcomeReason != "none"
 }

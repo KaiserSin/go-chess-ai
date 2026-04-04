@@ -21,3 +21,19 @@ func TestSpritePlacementForRect(t *testing.T) {
 		t.Fatalf("want scaleY 0.625, got %v", placement.ScaleY)
 	}
 }
+
+func TestTargetDotForSquare(t *testing.T) {
+	dot := targetDotForSquare(40, 88, 80)
+
+	if dot.CenterX != 80 {
+		t.Fatalf("want centerX 80, got %v", dot.CenterX)
+	}
+
+	if dot.CenterY != 128 {
+		t.Fatalf("want centerY 128, got %v", dot.CenterY)
+	}
+
+	if dot.Radius != 10 {
+		t.Fatalf("want radius 10, got %v", dot.Radius)
+	}
+}
