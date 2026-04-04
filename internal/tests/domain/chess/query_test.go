@@ -56,3 +56,32 @@ func TestIsFiftyMoveDraw(t *testing.T) {
 		t.Fatal("did not expect fifty-move draw")
 	}
 }
+
+func TestNewRepetitionKeyIgnoresClocks(t *testing.T) {
+	first := mustBuildPosition(t,
+		chess.NewPositionBuilder().
+			WithSideToMove(chess.White).
+			WithHalfmoveClock(4).
+			WithFullmoveNumber(7).
+			Place(mustParseSquare(t, "e1"), chess.White, chess.King).
+			Place(mustParseSquare(t, "g1"), chess.White, chess.Knight).
+			Place(mustParseSquare(t, "e8"), chess.Black, chess.King).
+			Place(mustParseSquare(t, "g8"), chess.Black, chess.Knight),
+	)
+	second := mustBuildPosition(t,
+		chess.NewPositionBuilder().
+			WithSideToMove(chess.White).
+			WithHalfmoveClock(80).
+			WithFullmoveNumber(22).
+			Place(mustParseSquare(t, "e1"), chess.White, chess.King).
+			Place(mustParseSquare(t, "g1"), chess.White, chess.Knight).
+			Place(mustParseSquare(t, "e8"), chess.Black, chess.King).
+			Place(mustParseSquare(t, "g8"), chess.Black, chess.Knight),
+	)
+
+	firstKey := chess.NewRepetitionKey(first)
+	secondKey := chess.NewRepetitionKey(second)
+	if firstKey != secondKey {
+		t.Fatal("want repetition key to ignore clocks")
+	}
+}

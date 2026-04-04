@@ -119,16 +119,8 @@ func TestBlackSelectionTriggersAutomaticAIMove(t *testing.T) {
 		t.Fatalf("want player side black, got %s", game.playerSide)
 	}
 
-	if got := game.board.Status; got != "white to move" {
-		t.Fatalf("want white turn status before ai move, got %q", got)
-	}
-
-	if err := game.updateGame(); err != nil {
-		t.Fatalf("updateGame error: %v", err)
-	}
-
 	if got := game.board.Status; got != "black to move" {
-		t.Fatalf("want black turn status after ai move, got %q", got)
+		t.Fatalf("want black turn status after immediate ai move, got %q", got)
 	}
 
 	snapshot := game.service.Snapshot()
@@ -138,6 +130,39 @@ func TestBlackSelectionTriggersAutomaticAIMove(t *testing.T) {
 
 	if square := squareByAlgebraic(t, snapshot, "a2"); square.Occupied {
 		t.Fatal("did not expect piece on a2 after ai move")
+	}
+}
+
+func TestAdvanceAITurnIfNeededRespondsImmediatelyAfterHumanMove(t *testing.T) {
+	game := newTestGame(t)
+	clickSideChoice(t, game, "white")
+
+	game.service.SelectSquareAt(4, 1)
+	if err := game.service.TryMoveAt(4, 3); err != nil {
+		t.Fatalf("want legal move, got %v", err)
+	}
+
+	game.refreshBoard()
+	if got := game.board.Status; got != "black to move" {
+		t.Fatalf("want black turn status before ai response, got %q", got)
+	}
+	before := game.service.Snapshot()
+
+	if err := game.advanceAITurnIfNeeded(); err != nil {
+		t.Fatalf("advanceAITurnIfNeeded error: %v", err)
+	}
+
+	if got := game.board.Status; got != "white to move" {
+		t.Fatalf("want white turn status after ai response, got %q", got)
+	}
+
+	after := game.service.Snapshot()
+	if after.FullmoveNumber != before.FullmoveNumber+1 {
+		t.Fatalf("want fullmove number %d, got %d", before.FullmoveNumber+1, after.FullmoveNumber)
+	}
+
+	if changedSquareCount(before, after) < 2 {
+		t.Fatal("want board to change after ai response")
 	}
 }
 
@@ -167,7 +192,9 @@ func clickSideChoice(t *testing.T, game *Game, side string) {
 			continue
 		}
 
-		game.handleMenuClick(choice.Rect.X+choice.Rect.Width/2, choice.Rect.Y+choice.Rect.Height/2)
+		if err := game.handleMenuClick(choice.Rect.X+choice.Rect.Width/2, choice.Rect.Y+choice.Rect.Height/2); err != nil {
+			t.Fatalf("handleMenuClick error: %v", err)
+		}
 		return
 	}
 
@@ -178,7 +205,9 @@ func focusDepthInput(t *testing.T, game *Game) {
 	t.Helper()
 
 	rect := boardinput.DepthInputRect(game.theme.WindowWidth)
-	game.handleMenuClick(rect.X+rect.Width/2, rect.Y+rect.Height/2)
+	if err := game.handleMenuClick(rect.X+rect.Width/2, rect.Y+rect.Height/2); err != nil {
+		t.Fatalf("handleMenuClick error: %v", err)
+	}
 }
 
 func squareCenter(uiTheme theme.Theme, blackPerspective bool, file, rank int) (int, int) {
@@ -224,4 +253,25 @@ func squareByAlgebraic(t *testing.T, snapshot dto.GameSnapshot, algebraic string
 
 	t.Fatalf("square %q not found", algebraic)
 	return dto.SquareSnapshot{}
+}
+
+func changedSquareCount(before, after dto.GameSnapshot) int {
+	squares := make(map[string]dto.SquareSnapshot, len(before.Squares))
+	for _, square := range before.Squares {
+		squares[square.Algebraic] = square
+	}
+
+	changed := 0
+	for _, square := range after.Squares {
+		previous, ok := squares[square.Algebraic]
+		if !ok {
+			continue
+		}
+
+		if previous.Occupied != square.Occupied || previous.PieceKey != square.PieceKey {
+			changed++
+		}
+	}
+
+	return changed
 }

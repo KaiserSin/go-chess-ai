@@ -382,20 +382,20 @@ func (g *Game) handleClick(screenX, screenY int) {
 	}
 }
 
-func (g *Game) handleMenuClick(screenX, screenY int) {
+func (g *Game) handleMenuClick(screenX, screenY int) error {
 	if g.input.DepthInputAt(screenX, screenY) {
 		g.focusDepthInput()
-		return
+		return nil
 	}
 
 	g.blurDepthInput()
 
 	side, ok := g.input.SideChoiceAt(screenX, screenY)
 	if !ok {
-		return
+		return nil
 	}
 
-	g.startGameAs(side)
+	return g.startGameAs(side)
 }
 
 func (g *Game) handlePromotionClick(screenX, screenY int) {
@@ -422,7 +422,7 @@ func (g *Game) promotionChoices() []string {
 	return choices
 }
 
-func (g *Game) startGameAs(side string) {
+func (g *Game) startGameAs(side string) error {
 	if side != "black" {
 		side = "white"
 	}
@@ -433,6 +433,8 @@ func (g *Game) startGameAs(side string) {
 	g.service.NewGame()
 	g.screen = playingScreen
 	g.refreshBoard()
+
+	return g.advanceAITurnIfNeeded()
 }
 
 func (g *Game) blackPerspective() bool {
@@ -455,8 +457,20 @@ func (g *Game) updateMenu() error {
 	}
 
 	mouseX, mouseY := ebiten.CursorPosition()
-	g.handleMenuClick(mouseX, mouseY)
+	return g.handleMenuClick(mouseX, mouseY)
+}
 
+func (g *Game) advanceAITurnIfNeeded() error {
+	snapshot := g.service.Snapshot()
+	if !g.isAITurn(snapshot.SideToMove, snapshot.OutcomeReason) {
+		return nil
+	}
+
+	if err := g.service.ApplyAIMove(); err != nil {
+		return err
+	}
+
+	g.refreshBoard()
 	return nil
 }
 
@@ -512,14 +526,8 @@ func (g *Game) menuSearchDepth() int {
 
 func (g *Game) updateGame() error {
 	g.refreshBoard()
-	snapshot := g.service.Snapshot()
-	if g.isAITurn(snapshot.SideToMove, snapshot.OutcomeReason) {
-		if err := g.service.ApplyAIMove(); err != nil {
-			return err
-		}
-
-		g.refreshBoard()
-		return nil
+	if err := g.advanceAITurnIfNeeded(); err != nil {
+		return err
 	}
 
 	if !inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
@@ -530,7 +538,7 @@ func (g *Game) updateGame() error {
 	g.handleClick(mouseX, mouseY)
 	g.refreshBoard()
 
-	return nil
+	return g.advanceAITurnIfNeeded()
 }
 
 func opponentSide(side string) string {

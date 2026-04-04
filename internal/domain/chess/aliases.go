@@ -17,6 +17,7 @@ type OutcomeReason = chessmodel.OutcomeReason
 type Outcome = chessmodel.Outcome
 type Position = chessposition.Position
 type PositionBuilder = chessposition.PositionBuilder
+type RepetitionKey = chessposition.RepetitionKey
 type Game = chessgame.Game
 
 const (
@@ -49,10 +50,10 @@ const (
 )
 
 const (
-	NoOutcomeReason              OutcomeReason = chessmodel.NoOutcomeReason
-	OutcomeByCheckmate           OutcomeReason = chessmodel.OutcomeByCheckmate
-	OutcomeByStalemate           OutcomeReason = chessmodel.OutcomeByStalemate
-	OutcomeByThreefoldRepetition OutcomeReason = chessmodel.OutcomeByThreefoldRepetition
-	OutcomeByFiftyMoveRule       OutcomeReason = chessmodel.OutcomeByFiftyMoveRule
+	NoOutcomeReason               OutcomeReason = chessmodel.NoOutcomeReason
+	OutcomeByCheckmate            OutcomeReason = chessmodel.OutcomeByCheckmate
+	OutcomeByStalemate            OutcomeReason = chessmodel.OutcomeByStalemate
+	OutcomeByThreefoldRepetition  OutcomeReason = chessmodel.OutcomeByThreefoldRepetition
+	OutcomeByFiftyMoveRule        OutcomeReason = chessmodel.OutcomeByFiftyMoveRule
 	OutcomeByInsufficientMaterial OutcomeReason = chessmodel.OutcomeByInsufficientMaterial
 )

@@ -9,3 +9,7 @@ func HasInsufficientMaterial(position Position) bool {
 func IsFiftyMoveDraw(position Position) bool {
 	return chessposition.IsFiftyMoveDraw(position)
 }
+
+func NewRepetitionKey(position Position) RepetitionKey {
+	return chessposition.NewRepetitionKey(position)
+}
