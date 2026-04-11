@@ -96,3 +96,26 @@ func TestBestMoveUsesFirstBestMoveOnEqualScores(t *testing.T) {
 		t.Fatalf("want 0, got %d", result.Score)
 	}
 }
+
+func TestBestMoveAvoidsPoisonedCaptureAtDepthOne(t *testing.T) {
+	position := mustBuildPosition(t,
+		chess.NewPositionBuilder().
+			WithSideToMove(chess.White).
+			Place(mustParseSquare(t, "g1"), chess.White, chess.King).
+			Place(mustParseSquare(t, "d1"), chess.White, chess.Queen).
+			Place(mustParseSquare(t, "a1"), chess.White, chess.Rook).
+			Place(mustParseSquare(t, "g8"), chess.Black, chess.King).
+			Place(mustParseSquare(t, "d8"), chess.Black, chess.Queen).
+			Place(mustParseSquare(t, "d7"), chess.Black, chess.Rook),
+	)
+
+	result := ai.BestMove(position, 1)
+
+	if !result.HasMove {
+		t.Fatal("want best move")
+	}
+
+	if got := result.Move.String(); got == "d1d7" {
+		t.Fatalf("did not expect poisoned capture d1d7, got %s", got)
+	}
+}

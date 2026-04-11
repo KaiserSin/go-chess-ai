@@ -31,7 +31,6 @@ const (
 	menuDepthHintY       = 328
 	menuSideLabelY       = 356
 	menuBorderWidth      = 2
-	maxAISearchDepth     = 20
 	menuInputPaddingX    = 14
 	menuInputPaddingY    = 13
 )
@@ -146,7 +145,7 @@ func (g *Game) drawMenu(screen *ebiten.Image) {
 		depthRect.Y+menuInputPaddingY,
 		g.theme.LabelColor,
 	)
-	drawCenteredText(screen, "Type a number from 1 to 20", g.labelFace, g.theme.WindowWidth/2, menuDepthHintY, g.theme.LabelColor)
+	drawCenteredText(screen, "Type a number from 1 to "+strconv.Itoa(gameplay.MaxAISearchDepth), g.labelFace, g.theme.WindowWidth/2, menuDepthHintY, g.theme.LabelColor)
 
 	drawCenteredText(screen, "Choose your side", g.statusFace, g.theme.WindowWidth/2, menuSideLabelY, g.theme.StatusColor)
 
@@ -572,7 +571,7 @@ func parseDepthInput(value string) (int, bool) {
 	}
 
 	depth, err := strconv.Atoi(value)
-	if err != nil || depth < 1 || depth > maxAISearchDepth {
+	if err != nil || depth < 1 || depth > gameplay.MaxAISearchDepth {
 		return 0, false
 	}
 

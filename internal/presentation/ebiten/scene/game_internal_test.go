@@ -34,15 +34,14 @@ func TestNewGameStartsOnMenuScreen(t *testing.T) {
 func TestDepthInputUpdatesMenuChoice(t *testing.T) {
 	game := newTestGame(t)
 	focusDepthInput(t, game)
-	game.appendDepthDigit('1')
-	game.appendDepthDigit('2')
+	game.appendDepthDigit('5')
 
-	if game.aiSearchDepth != 12 {
-		t.Fatalf("want ai depth 12, got %d", game.aiSearchDepth)
+	if game.aiSearchDepth != 5 {
+		t.Fatalf("want ai depth 5, got %d", game.aiSearchDepth)
 	}
 
-	if game.depthInput != "12" {
-		t.Fatalf("want depth input 12, got %q", game.depthInput)
+	if game.depthInput != "5" {
+		t.Fatalf("want depth input 5, got %q", game.depthInput)
 	}
 }
 
@@ -57,24 +56,23 @@ func TestDepthInputStaysEmptyAfterBlur(t *testing.T) {
 	}
 }
 
-func TestDepthInputRejectsValuesAboveTwenty(t *testing.T) {
+func TestDepthInputRejectsValuesAboveFive(t *testing.T) {
 	game := newTestGame(t)
 	focusDepthInput(t, game)
-	game.appendDepthDigit('2')
-	game.appendDepthDigit('0')
+	game.appendDepthDigit('5')
 
-	if game.aiSearchDepth != 20 {
-		t.Fatalf("want ai depth 20, got %d", game.aiSearchDepth)
+	if game.aiSearchDepth != gameplay.MaxAISearchDepth {
+		t.Fatalf("want ai depth %d, got %d", gameplay.MaxAISearchDepth, game.aiSearchDepth)
 	}
 
 	game.appendDepthDigit('1')
 
-	if game.aiSearchDepth != 20 {
-		t.Fatalf("want ai depth to stay 20, got %d", game.aiSearchDepth)
+	if game.aiSearchDepth != gameplay.MaxAISearchDepth {
+		t.Fatalf("want ai depth to stay %d, got %d", gameplay.MaxAISearchDepth, game.aiSearchDepth)
 	}
 
-	if game.depthInput != "20" {
-		t.Fatalf("want depth input 20, got %q", game.depthInput)
+	if game.depthInput != "5" {
+		t.Fatalf("want depth input 5, got %q", game.depthInput)
 	}
 }
 

@@ -12,8 +12,10 @@ func TestApplyAIMoveUsesConfiguredDepth(t *testing.T) {
 			WithSideToMove(chess.White).
 			Place(mustSquareAt(t, 4, 0), chess.White, chess.King).
 			Place(mustSquareAt(t, 3, 0), chess.White, chess.Queen).
+			Place(mustSquareAt(t, 0, 0), chess.White, chess.Rook).
 			Place(mustSquareAt(t, 4, 7), chess.Black, chess.King).
-			Place(mustSquareAt(t, 3, 7), chess.Black, chess.Rook),
+			Place(mustSquareAt(t, 3, 7), chess.Black, chess.Queen).
+			Place(mustSquareAt(t, 0, 7), chess.Black, chess.Bishop),
 	))
 	depthOne.SetAISearchDepth(1)
 
@@ -31,8 +33,10 @@ func TestApplyAIMoveUsesConfiguredDepth(t *testing.T) {
 			WithSideToMove(chess.White).
 			Place(mustSquareAt(t, 4, 0), chess.White, chess.King).
 			Place(mustSquareAt(t, 3, 0), chess.White, chess.Queen).
+			Place(mustSquareAt(t, 0, 0), chess.White, chess.Rook).
 			Place(mustSquareAt(t, 4, 7), chess.Black, chess.King).
-			Place(mustSquareAt(t, 3, 7), chess.Black, chess.Rook),
+			Place(mustSquareAt(t, 3, 7), chess.Black, chess.Queen).
+			Place(mustSquareAt(t, 0, 7), chess.Black, chess.Bishop),
 	))
 	depthTwo.SetAISearchDepth(2)
 
@@ -41,7 +45,26 @@ func TestApplyAIMoveUsesConfiguredDepth(t *testing.T) {
 	}
 
 	depthTwoSnapshot := depthTwo.Snapshot()
-	if square := squareByAlgebraic(t, depthTwoSnapshot, "d8"); square.PieceKey != "black-rook" {
-		t.Fatalf("want black-rook to stay on d8 after depth 2, got %q", square.PieceKey)
+	if square := squareByAlgebraic(t, depthTwoSnapshot, "e2"); square.PieceKey != "white-queen" {
+		t.Fatalf("want white-queen on e2 after depth 2, got %q", square.PieceKey)
+	}
+}
+
+func TestSetAISearchDepthClampsToSupportedRange(t *testing.T) {
+	service := NewService()
+
+	service.SetAISearchDepth(0)
+	if service.aiSearchDepth != defaultAISearchDepth {
+		t.Fatalf("want default ai depth %d after zero, got %d", defaultAISearchDepth, service.aiSearchDepth)
+	}
+
+	service.SetAISearchDepth(3)
+	if service.aiSearchDepth != 3 {
+		t.Fatalf("want ai depth 3, got %d", service.aiSearchDepth)
+	}
+
+	service.SetAISearchDepth(9)
+	if service.aiSearchDepth != MaxAISearchDepth {
+		t.Fatalf("want ai depth clamped to %d, got %d", MaxAISearchDepth, service.aiSearchDepth)
 	}
 }

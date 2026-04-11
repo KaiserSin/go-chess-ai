@@ -106,6 +106,9 @@ func searchAtDepth(position chess.Position, depth int, table *transpositionTable
 	}
 
 	rootEntry, hasRootEntry := table.probe(position)
+	if hasRootEntry && hooks != nil {
+		hooks.ttHits++
+	}
 	orderedMoves := orderMoves(position, originalMoves, rootEntry.bestMove, hasRootEntry)
 	results := collectRootResults(position, originalMoves, orderedMoves, depth-1, rootPerspective, table, hooks)
 	bestResult := pickBestRootResult(results)
@@ -238,7 +241,11 @@ func alphaBeta(position chess.Position, depth int, alpha, beta int, rootPerspect
 	}
 
 	if depth <= 0 || isTerminalPosition(position) {
-		return evaluateAndStore(position, depth, rootPerspective, table, hooks)
+		if isTerminalPosition(position) {
+			return evaluateAndStore(position, depth, rootPerspective, table, hooks)
+		}
+
+		return quiescence(position, alpha, beta, rootPerspective, hooks)
 	}
 
 	moves := orderMoves(position, position.LegalMoves(), entry.bestMove, hasEntry)
@@ -313,12 +320,84 @@ func isTerminalPosition(position chess.Position) bool {
 	return chess.HasInsufficientMaterial(position) || chess.IsFiftyMoveDraw(position)
 }
 
-func evaluateAndStore(position chess.Position, depth int, rootPerspective chess.Side, table *transpositionTable, hooks *searchHooks) int {
+func quiescence(position chess.Position, alpha, beta int, rootPerspective chess.Side, hooks *searchHooks) int {
+	standPat := evaluateStatic(position, rootPerspective, hooks)
+	maximizing := position.SideToMove() == rootPerspective
+	bestScore := standPat
+
+	if maximizing {
+		if standPat >= beta {
+			return standPat
+		}
+
+		if standPat > alpha {
+			alpha = standPat
+		}
+	} else {
+		if standPat <= alpha {
+			return standPat
+		}
+
+		if standPat < beta {
+			beta = standPat
+		}
+	}
+
+	moves := tacticalMoves(position)
+	for _, move := range moves {
+		next, err := position.ApplyMove(move)
+		if err != nil {
+			panic(err)
+		}
+
+		score := quiescence(next, alpha, beta, rootPerspective, hooks)
+		if betterScore(score, bestScore, maximizing) {
+			bestScore = score
+		}
+
+		if maximizing {
+			if score > alpha {
+				alpha = score
+			}
+		} else if score < beta {
+			beta = score
+		}
+
+		if alpha >= beta {
+			if hooks != nil {
+				hooks.cutoffs++
+			}
+
+			break
+		}
+	}
+
+	return bestScore
+}
+
+func tacticalMoves(position chess.Position) []chess.Move {
+	moves := position.LegalMoves()
+	tactical := make([]chess.Move, 0, len(moves))
+
+	for _, move := range moves {
+		if move.Promotion != chess.NoPieceType || isCaptureMove(position, move) {
+			tactical = append(tactical, move)
+		}
+	}
+
+	return orderMoves(position, tactical, chess.Move{}, false)
+}
+
+func evaluateStatic(position chess.Position, rootPerspective chess.Side, hooks *searchHooks) int {
 	if hooks != nil {
 		hooks.leafEvaluations++
 	}
 
-	score := Evaluate(position, rootPerspective)
+	return Evaluate(position, rootPerspective)
+}
+
+func evaluateAndStore(position chess.Position, depth int, rootPerspective chess.Side, table *transpositionTable, hooks *searchHooks) int {
+	score := evaluateStatic(position, rootPerspective, hooks)
 	table.store(position, ttEntry{
 		depth: depth,
 		score: score,

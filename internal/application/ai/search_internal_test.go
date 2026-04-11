@@ -268,6 +268,28 @@ func TestIterativeDeepeningReusesTTBetweenDepths(t *testing.T) {
 	}
 }
 
+func TestAlphaBetaLeafSeesImmediateRecapture(t *testing.T) {
+	position := mustBuildPosition(t,
+		chess.NewPositionBuilder().
+			WithSideToMove(chess.White).
+			Place(mustParseSquare(t, "g1"), chess.White, chess.King).
+			Place(mustParseSquare(t, "d1"), chess.White, chess.Queen).
+			Place(mustParseSquare(t, "a1"), chess.White, chess.Rook).
+			Place(mustParseSquare(t, "g8"), chess.Black, chess.King).
+			Place(mustParseSquare(t, "d8"), chess.Black, chess.Queen).
+			Place(mustParseSquare(t, "d7"), chess.Black, chess.Rook),
+	)
+	afterCapture, err := position.ApplyMove(mustMove(t, "d1", "d7"))
+	if err != nil {
+		t.Fatalf("ApplyMove error: %v", err)
+	}
+
+	score := alphaBeta(afterCapture, 0, -searchInfinity, searchInfinity, chess.White, nil, nil)
+	if score >= 0 {
+		t.Fatalf("want poisoned capture to evaluate as bad after recapture, got %d", score)
+	}
+}
+
 func fullMinimax(position chess.Position, depth int, rootPerspective chess.Side, leafEvaluations *int) int {
 	if depth <= 0 || isTerminalPosition(position) {
 		*leafEvaluations = *leafEvaluations + 1

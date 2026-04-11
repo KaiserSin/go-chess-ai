@@ -9,7 +9,10 @@ import (
 	"github.com/KaiserSin/go-chess-ai/internal/application/dto"
 )
 
-const defaultAISearchDepth = 2
+const (
+	defaultAISearchDepth = 2
+	MaxAISearchDepth     = 5
+)
 
 type Service struct {
 	game             *chess.Game
@@ -153,6 +156,11 @@ func (s *Service) ChoosePromotionByName(pieceType string) error {
 func (s *Service) SetAISearchDepth(depth int) {
 	if depth <= 0 {
 		s.aiSearchDepth = defaultAISearchDepth
+		return
+	}
+
+	if depth > MaxAISearchDepth {
+		s.aiSearchDepth = MaxAISearchDepth
 		return
 	}
 
