@@ -1,7 +1,6 @@
 package ai
 
 import (
-	"runtime"
 	"sync"
 
 	chess "github.com/KaiserSin/go-chess-ai/internal/domain/chess"
@@ -32,18 +31,6 @@ type searchHooks struct {
 	leafEvaluations int
 	cutoffs         int
 	ttHits          int
-}
-
-type rootSearchJob struct {
-	originalIndex int
-	move          chess.Move
-	position      chess.Position
-}
-
-type rootSearchResult struct {
-	originalIndex int
-	move          chess.Move
-	score         int
 }
 
 func BuildTree(position chess.Position, depth int) Node {
@@ -109,49 +96,35 @@ func bestMoveAtDepthWithHooks(position chess.Position, depth int, table *transpo
 	}
 
 	rootEntry, hasRootEntry := table.probe(position)
-	orderedJobs := orderedRootJobs(position, moves, rootEntry.bestMove, hasRootEntry)
-	firstResult := evaluateRootJob(orderedJobs[0], depth-1, rootPerspective, -searchInfinity, table, hooks)
-	rootResults := make([]rootSearchResult, len(moves))
-	rootResults[firstResult.originalIndex] = firstResult
+	ordered := reorderMoves(position, moves, rootEntry.bestMove, hasRootEntry)
+	moveIndex := indexMoves(moves)
+	results := make([]SearchResult, len(moves))
 
-	bestResult := firstResult
-	if len(moves) == 1 {
-		table.store(position, ttEntry{
-			depth:    depth,
-			score:    bestResult.score,
-			bound:    ttExact,
-			bestMove: bestResult.move,
-		})
-		return SearchResult{
-			Move:    bestResult.move,
-			Score:   bestResult.score,
-			HasMove: true,
-		}
-	}
-
-	results := searchRootMovesParallel(orderedJobs[1:], depth-1, rootPerspective, firstResult.score, table)
-	for _, result := range results {
-		rootResults[result.originalIndex] = result
-	}
-
-	for index := 1; index < len(rootResults); index++ {
-		if betterScore(rootResults[index].score, bestResult.score, true) {
-			bestResult = rootResults[index]
-		}
-	}
-
-	table.store(position, ttEntry{
-		depth:    depth,
-		score:    bestResult.score,
-		bound:    ttExact,
-		bestMove: bestResult.move,
-	})
-
-	return SearchResult{
-		Move:    bestResult.move,
-		Score:   bestResult.score,
+	firstMove := ordered[0]
+	firstScore := searchRootMove(position, firstMove, depth-1, rootPerspective, -searchInfinity, table, hooks)
+	results[moveIndex[firstMove]] = SearchResult{
+		Move:    firstMove,
+		Score:   firstScore,
 		HasMove: true,
 	}
+
+	if len(ordered) > 1 {
+		if hooks != nil {
+			searchRemainingRootMovesSequential(position, ordered[1:], moveIndex, depth-1, rootPerspective, firstScore, table, hooks, results)
+		} else {
+			searchRemainingRootMovesParallel(position, ordered[1:], moveIndex, depth-1, rootPerspective, firstScore, table, results)
+		}
+	}
+
+	bestResult := pickBestResult(results)
+	table.store(position, ttEntry{
+		depth:    depth,
+		score:    bestResult.Score,
+		bound:    ttExact,
+		bestMove: bestResult.Move,
+	})
+
+	return bestResult
 }
 
 func noMoveSearchResult(position chess.Position, rootPerspective chess.Side) SearchResult {
@@ -161,58 +134,68 @@ func noMoveSearchResult(position chess.Position, rootPerspective chess.Side) Sea
 	}
 }
 
-func evaluateRootJob(job rootSearchJob, depth int, rootPerspective chess.Side, alpha int, table *transpositionTable, hooks *searchHooks) rootSearchResult {
-	return rootSearchResult{
-		originalIndex: job.originalIndex,
-		move:          job.move,
-		score:         alphaBeta(job.position, depth, alpha, searchInfinity, rootPerspective, table, hooks),
+func indexMoves(moves []chess.Move) map[chess.Move]int {
+	indexes := make(map[chess.Move]int, len(moves))
+	for index, move := range moves {
+		indexes[move] = index
+	}
+
+	return indexes
+}
+
+func searchRootMove(position chess.Position, move chess.Move, depth int, rootPerspective chess.Side, alpha int, table *transpositionTable, hooks *searchHooks) int {
+	next, err := position.ApplyMove(move)
+	if err != nil {
+		panic(err)
+	}
+
+	return alphaBeta(next, depth, alpha, searchInfinity, rootPerspective, table, hooks)
+}
+
+func searchRemainingRootMovesSequential(position chess.Position, moves []chess.Move, moveIndex map[chess.Move]int, depth int, rootPerspective chess.Side, alpha int, table *transpositionTable, hooks *searchHooks, results []SearchResult) {
+	for _, move := range moves {
+		score := searchRootMove(position, move, depth, rootPerspective, alpha, table, hooks)
+		results[moveIndex[move]] = SearchResult{
+			Move:    move,
+			Score:   score,
+			HasMove: true,
+		}
 	}
 }
 
-func searchRootMovesParallel(jobsToSearch []rootSearchJob, depth int, rootPerspective chess.Side, alpha int, table *transpositionTable) []rootSearchResult {
-	if len(jobsToSearch) == 0 {
-		return nil
-	}
+func searchRemainingRootMovesParallel(position chess.Position, moves []chess.Move, moveIndex map[chess.Move]int, depth int, rootPerspective chess.Side, alpha int, table *transpositionTable, results []SearchResult) {
+	var wait sync.WaitGroup
+	var mu sync.Mutex
 
-	workerCount := runtime.GOMAXPROCS(0)
-	if workerCount <= 0 {
-		workerCount = 1
-	}
-	if workerCount > len(jobsToSearch) {
-		workerCount = len(jobsToSearch)
-	}
+	for _, move := range moves {
+		index := moveIndex[move]
+		wait.Add(1)
+		go func(index int, move chess.Move) {
+			defer wait.Done()
 
-	jobs := make(chan rootSearchJob, len(jobsToSearch))
-	results := make(chan rootSearchResult, len(jobsToSearch))
-
-	var workers sync.WaitGroup
-	for index := 0; index < workerCount; index++ {
-		workers.Add(1)
-		go func() {
-			defer workers.Done()
-
-			for job := range jobs {
-				results <- evaluateRootJob(job, depth, rootPerspective, alpha, table, nil)
+			score := searchRootMove(position, move, depth, rootPerspective, alpha, table, nil)
+			mu.Lock()
+			results[index] = SearchResult{
+				Move:    move,
+				Score:   score,
+				HasMove: true,
 			}
-		}()
+			mu.Unlock()
+		}(index, move)
 	}
 
-	for _, job := range jobsToSearch {
-		jobs <- job
-	}
-	close(jobs)
+	wait.Wait()
+}
 
-	go func() {
-		workers.Wait()
-		close(results)
-	}()
-
-	out := make([]rootSearchResult, 0, len(jobsToSearch))
-	for result := range results {
-		out = append(out, result)
+func pickBestResult(results []SearchResult) SearchResult {
+	best := results[0]
+	for index := 1; index < len(results); index++ {
+		if betterScore(results[index].Score, best.Score, true) {
+			best = results[index]
+		}
 	}
 
-	return out
+	return best
 }
 
 func alphaBeta(position chess.Position, depth int, alpha, beta int, rootPerspective chess.Side, table *transpositionTable, hooks *searchHooks) int {
@@ -343,45 +326,6 @@ func isTerminalPosition(position chess.Position) bool {
 
 func orderedMoves(position chess.Position, hashMove chess.Move, hasHashMove bool) []chess.Move {
 	return reorderMoves(position, position.LegalMoves(), hashMove, hasHashMove)
-}
-
-func orderedRootJobs(position chess.Position, moves []chess.Move, hashMove chess.Move, hasHashMove bool) []rootSearchJob {
-	hashJobs := make([]rootSearchJob, 0, 1)
-	promotions := make([]rootSearchJob, 0, len(moves))
-	captures := make([]rootSearchJob, 0, len(moves))
-	quiets := make([]rootSearchJob, 0, len(moves))
-
-	for index, move := range moves {
-		next, err := position.ApplyMove(move)
-		if err != nil {
-			panic(err)
-		}
-
-		job := rootSearchJob{
-			originalIndex: index,
-			move:          move,
-			position:      next,
-		}
-
-		if hasHashMove && move == hashMove {
-			hashJobs = append(hashJobs, job)
-			continue
-		}
-
-		switch movePriority(position, move) {
-		case movePriorityPromotion:
-			promotions = append(promotions, job)
-		case movePriorityCapture:
-			captures = append(captures, job)
-		default:
-			quiets = append(quiets, job)
-		}
-	}
-
-	ordered := append(hashJobs, promotions...)
-	ordered = append(ordered, captures...)
-	ordered = append(ordered, quiets...)
-	return ordered
 }
 
 func reorderMoves(position chess.Position, moves []chess.Move, hashMove chess.Move, hasHashMove bool) []chess.Move {

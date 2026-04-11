@@ -301,42 +301,36 @@ func fullMinimax(position chess.Position, depth int, rootPerspective chess.Side,
 func bestMoveSequential(position chess.Position, depth int) SearchResult {
 	rootPerspective := position.SideToMove()
 	if depth <= 0 || isTerminalPosition(position) {
-		return SearchResult{
-			Score:   Evaluate(position, rootPerspective),
-			HasMove: false,
-		}
+		return noMoveSearchResult(position, rootPerspective)
 	}
 
 	moves := position.LegalMoves()
 	if len(moves) == 0 {
-		return SearchResult{
-			Score:   Evaluate(position, rootPerspective),
-			HasMove: false,
-		}
+		return noMoveSearchResult(position, rootPerspective)
 	}
 
-	orderedJobs := orderedRootJobs(position, moves, chess.Move{}, false)
-	firstResult := evaluateRootJob(orderedJobs[0], depth-1, rootPerspective, -searchInfinity, nil, nil)
-	rootResults := make([]rootSearchResult, len(moves))
-	rootResults[firstResult.originalIndex] = firstResult
+	ordered := reorderMoves(position, moves, chess.Move{}, false)
+	moveIndex := indexMoves(moves)
+	results := make([]SearchResult, len(moves))
 
-	for _, job := range orderedJobs[1:] {
-		result := evaluateRootJob(job, depth-1, rootPerspective, firstResult.score, nil, nil)
-		rootResults[result.originalIndex] = result
-	}
-
-	bestResult := rootResults[0]
-	for index := 1; index < len(rootResults); index++ {
-		if betterScore(rootResults[index].score, bestResult.score, true) {
-			bestResult = rootResults[index]
-		}
-	}
-
-	return SearchResult{
-		Move:    bestResult.move,
-		Score:   bestResult.score,
+	firstMove := ordered[0]
+	firstScore := searchRootMove(position, firstMove, depth-1, rootPerspective, -searchInfinity, nil, nil)
+	results[moveIndex[firstMove]] = SearchResult{
+		Move:    firstMove,
+		Score:   firstScore,
 		HasMove: true,
 	}
+
+	for _, move := range ordered[1:] {
+		score := searchRootMove(position, move, depth-1, rootPerspective, firstScore, nil, nil)
+		results[moveIndex[move]] = SearchResult{
+			Move:    move,
+			Score:   score,
+			HasMove: true,
+		}
+	}
+
+	return pickBestResult(results)
 }
 
 func alphaBetaUnordered(position chess.Position, depth int, alpha, beta int, rootPerspective chess.Side, hooks *searchHooks) int {

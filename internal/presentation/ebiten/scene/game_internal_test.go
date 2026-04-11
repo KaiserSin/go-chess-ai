@@ -119,8 +119,20 @@ func TestBlackSelectionTriggersAutomaticAIMove(t *testing.T) {
 		t.Fatalf("want player side black, got %s", game.playerSide)
 	}
 
+	if got := game.board.Status; got != "white to move" {
+		t.Fatalf("want white turn status before ai move, got %q", got)
+	}
+
+	if !game.aiMoveQueued {
+		t.Fatal("want queued ai move after choosing black")
+	}
+
+	if err := game.updateGame(); err != nil {
+		t.Fatalf("updateGame error: %v", err)
+	}
+
 	if got := game.board.Status; got != "black to move" {
-		t.Fatalf("want black turn status after immediate ai move, got %q", got)
+		t.Fatalf("want black turn status after queued ai move, got %q", got)
 	}
 
 	snapshot := game.service.Snapshot()
@@ -133,7 +145,7 @@ func TestBlackSelectionTriggersAutomaticAIMove(t *testing.T) {
 	}
 }
 
-func TestAdvanceAITurnIfNeededRespondsImmediatelyAfterHumanMove(t *testing.T) {
+func TestQueuedAITurnRunsOnNextUpdateAfterHumanMove(t *testing.T) {
 	game := newTestGame(t)
 	clickSideChoice(t, game, "white")
 
@@ -144,16 +156,37 @@ func TestAdvanceAITurnIfNeededRespondsImmediatelyAfterHumanMove(t *testing.T) {
 
 	game.refreshBoard()
 	if got := game.board.Status; got != "black to move" {
-		t.Fatalf("want black turn status before ai response, got %q", got)
+		t.Fatalf("want black turn status after human move, got %q", got)
 	}
 	before := game.service.Snapshot()
 
-	if err := game.advanceAITurnIfNeeded(); err != nil {
-		t.Fatalf("advanceAITurnIfNeeded error: %v", err)
+	if err := game.updateGame(); err != nil {
+		t.Fatalf("updateGame error: %v", err)
+	}
+
+	if !game.aiMoveQueued {
+		t.Fatal("want queued ai move after first update")
+	}
+
+	queued := game.service.Snapshot()
+	if changedSquareCount(before, queued) != 0 {
+		t.Fatal("did not expect ai move on first update")
+	}
+
+	if got := game.board.Status; got != "black to move" {
+		t.Fatalf("want black turn status while ai is queued, got %q", got)
+	}
+
+	if err := game.updateGame(); err != nil {
+		t.Fatalf("second updateGame error: %v", err)
 	}
 
 	if got := game.board.Status; got != "white to move" {
-		t.Fatalf("want white turn status after ai response, got %q", got)
+		t.Fatalf("want white turn status after queued ai response, got %q", got)
+	}
+
+	if game.aiMoveQueued {
+		t.Fatal("did not expect queued ai move after response")
 	}
 
 	after := game.service.Snapshot()

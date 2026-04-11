@@ -49,6 +49,7 @@ type Game struct {
 	screen        screenState
 	playerSide    string
 	aiSearchDepth int
+	aiMoveQueued  bool
 	depthInput    string
 	depthFocused  bool
 	board         viewmodel.BoardViewModel
@@ -432,9 +433,10 @@ func (g *Game) startGameAs(side string) error {
 	g.service.SetAISearchDepth(g.aiSearchDepth)
 	g.service.NewGame()
 	g.screen = playingScreen
+	g.aiMoveQueued = false
 	g.refreshBoard()
-
-	return g.advanceAITurnIfNeeded()
+	g.queueAITurnIfNeeded()
+	return nil
 }
 
 func (g *Game) blackPerspective() bool {
@@ -460,18 +462,17 @@ func (g *Game) updateMenu() error {
 	return g.handleMenuClick(mouseX, mouseY)
 }
 
-func (g *Game) advanceAITurnIfNeeded() error {
+func (g *Game) queueAITurnIfNeeded() {
 	snapshot := g.service.Snapshot()
-	if !g.isAITurn(snapshot.SideToMove, snapshot.OutcomeReason) {
-		return nil
+	g.aiMoveQueued = false
+
+	if snapshot.Promotion != nil && snapshot.Promotion.Visible {
+		return
 	}
 
-	if err := g.service.ApplyAIMove(); err != nil {
-		return err
+	if g.isAITurn(snapshot.SideToMove, snapshot.OutcomeReason) {
+		g.aiMoveQueued = true
 	}
-
-	g.refreshBoard()
-	return nil
 }
 
 func (g *Game) handleMenuKeyboardInput() {
@@ -526,8 +527,20 @@ func (g *Game) menuSearchDepth() int {
 
 func (g *Game) updateGame() error {
 	g.refreshBoard()
-	if err := g.advanceAITurnIfNeeded(); err != nil {
-		return err
+	if g.aiMoveQueued {
+		g.aiMoveQueued = false
+		if err := g.service.ApplyAIMove(); err != nil {
+			return err
+		}
+
+		g.refreshBoard()
+		return nil
+	}
+
+	snapshot := g.service.Snapshot()
+	if g.isAITurn(snapshot.SideToMove, snapshot.OutcomeReason) {
+		g.aiMoveQueued = true
+		return nil
 	}
 
 	if !inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
@@ -537,8 +550,8 @@ func (g *Game) updateGame() error {
 	mouseX, mouseY := ebiten.CursorPosition()
 	g.handleClick(mouseX, mouseY)
 	g.refreshBoard()
-
-	return g.advanceAITurnIfNeeded()
+	g.queueAITurnIfNeeded()
+	return nil
 }
 
 func opponentSide(side string) string {
