@@ -229,7 +229,7 @@ func TestOrderedMovesPutsHashMoveFirst(t *testing.T) {
 	position := chess.NewInitialPosition()
 	hashMove := mustMove(t, "b1", "c3")
 
-	moves := orderedMoves(position, hashMove, true)
+	moves := orderMoves(position, position.LegalMoves(), hashMove, true)
 	if len(moves) == 0 {
 		t.Fatal("want ordered moves")
 	}
@@ -304,33 +304,16 @@ func bestMoveSequential(position chess.Position, depth int) SearchResult {
 		return noMoveSearchResult(position, rootPerspective)
 	}
 
-	moves := position.LegalMoves()
-	if len(moves) == 0 {
-		return noMoveSearchResult(position, rootPerspective)
-	}
-
-	ordered := reorderMoves(position, moves, chess.Move{}, false)
-	moveIndex := indexMoves(moves)
-	results := make([]SearchResult, len(moves))
-
-	firstMove := ordered[0]
-	firstScore := searchRootMove(position, firstMove, depth-1, rootPerspective, -searchInfinity, nil, nil)
-	results[moveIndex[firstMove]] = SearchResult{
-		Move:    firstMove,
-		Score:   firstScore,
-		HasMove: true,
-	}
-
-	for _, move := range ordered[1:] {
-		score := searchRootMove(position, move, depth-1, rootPerspective, firstScore, nil, nil)
-		results[moveIndex[move]] = SearchResult{
-			Move:    move,
-			Score:   score,
-			HasMove: true,
+	table := newTranspositionTable()
+	best := noMoveSearchResult(position, rootPerspective)
+	for currentDepth := 1; currentDepth <= depth; currentDepth++ {
+		result := bestMoveAtDepthWithHooks(position, currentDepth, table, &searchHooks{})
+		if result.HasMove {
+			best = result
 		}
 	}
 
-	return pickBestResult(results)
+	return best
 }
 
 func alphaBetaUnordered(position chess.Position, depth int, alpha, beta int, rootPerspective chess.Side, hooks *searchHooks) int {

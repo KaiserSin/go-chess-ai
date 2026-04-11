@@ -27,6 +27,12 @@ type SearchResult struct {
 	HasMove bool
 }
 
+type rootMoveResult struct {
+	move          chess.Move
+	score         int
+	originalIndex int
+}
+
 type searchHooks struct {
 	leafEvaluations int
 	cutoffs         int
@@ -71,7 +77,7 @@ func BestMove(position chess.Position, depth int) SearchResult {
 	table := newTranspositionTable()
 	bestResult := noMoveSearchResult(position, rootPerspective)
 	for currentDepth := 1; currentDepth <= depth; currentDepth++ {
-		result := bestMoveAtDepth(position, currentDepth, table)
+		result := searchAtDepth(position, currentDepth, table, nil)
 		if result.HasMove {
 			bestResult = result
 		}
@@ -81,42 +87,28 @@ func BestMove(position chess.Position, depth int) SearchResult {
 }
 
 func bestMoveAtDepth(position chess.Position, depth int, table *transpositionTable) SearchResult {
-	return bestMoveAtDepthWithHooks(position, depth, table, nil)
+	return searchAtDepth(position, depth, table, nil)
 }
 
 func bestMoveAtDepthWithHooks(position chess.Position, depth int, table *transpositionTable, hooks *searchHooks) SearchResult {
+	return searchAtDepth(position, depth, table, hooks)
+}
+
+func searchAtDepth(position chess.Position, depth int, table *transpositionTable, hooks *searchHooks) SearchResult {
 	rootPerspective := position.SideToMove()
 	if depth <= 0 || isTerminalPosition(position) {
 		return noMoveSearchResult(position, rootPerspective)
 	}
 
-	moves := position.LegalMoves()
-	if len(moves) == 0 {
+	originalMoves := position.LegalMoves()
+	if len(originalMoves) == 0 {
 		return noMoveSearchResult(position, rootPerspective)
 	}
 
 	rootEntry, hasRootEntry := table.probe(position)
-	ordered := reorderMoves(position, moves, rootEntry.bestMove, hasRootEntry)
-	moveIndex := indexMoves(moves)
-	results := make([]SearchResult, len(moves))
-
-	firstMove := ordered[0]
-	firstScore := searchRootMove(position, firstMove, depth-1, rootPerspective, -searchInfinity, table, hooks)
-	results[moveIndex[firstMove]] = SearchResult{
-		Move:    firstMove,
-		Score:   firstScore,
-		HasMove: true,
-	}
-
-	if len(ordered) > 1 {
-		if hooks != nil {
-			searchRemainingRootMovesSequential(position, ordered[1:], moveIndex, depth-1, rootPerspective, firstScore, table, hooks, results)
-		} else {
-			searchRemainingRootMovesParallel(position, ordered[1:], moveIndex, depth-1, rootPerspective, firstScore, table, results)
-		}
-	}
-
-	bestResult := pickBestResult(results)
+	orderedMoves := orderMoves(position, originalMoves, rootEntry.bestMove, hasRootEntry)
+	results := collectRootResults(position, originalMoves, orderedMoves, depth-1, rootPerspective, table, hooks)
+	bestResult := pickBestRootResult(results)
 	table.store(position, ttEntry{
 		depth:    depth,
 		score:    bestResult.Score,
@@ -134,15 +126,6 @@ func noMoveSearchResult(position chess.Position, rootPerspective chess.Side) Sea
 	}
 }
 
-func indexMoves(moves []chess.Move) map[chess.Move]int {
-	indexes := make(map[chess.Move]int, len(moves))
-	for index, move := range moves {
-		indexes[move] = index
-	}
-
-	return indexes
-}
-
 func searchRootMove(position chess.Position, move chess.Move, depth int, rootPerspective chess.Side, alpha int, table *transpositionTable, hooks *searchHooks) int {
 	next, err := position.ApplyMove(move)
 	if err != nil {
@@ -152,50 +135,76 @@ func searchRootMove(position chess.Position, move chess.Move, depth int, rootPer
 	return alphaBeta(next, depth, alpha, searchInfinity, rootPerspective, table, hooks)
 }
 
-func searchRemainingRootMovesSequential(position chess.Position, moves []chess.Move, moveIndex map[chess.Move]int, depth int, rootPerspective chess.Side, alpha int, table *transpositionTable, hooks *searchHooks, results []SearchResult) {
-	for _, move := range moves {
-		score := searchRootMove(position, move, depth, rootPerspective, alpha, table, hooks)
-		results[moveIndex[move]] = SearchResult{
-			Move:    move,
-			Score:   score,
-			HasMove: true,
-		}
+func collectRootResults(position chess.Position, originalMoves []chess.Move, orderedMoves []chess.Move, depth int, rootPerspective chess.Side, table *transpositionTable, hooks *searchHooks) []rootMoveResult {
+	firstMove := orderedMoves[0]
+	firstResult := rootMoveResult{
+		move:          firstMove,
+		score:         searchRootMove(position, firstMove, depth, rootPerspective, -searchInfinity, table, hooks),
+		originalIndex: findMoveIndex(originalMoves, firstMove),
 	}
-}
 
-func searchRemainingRootMovesParallel(position chess.Position, moves []chess.Move, moveIndex map[chess.Move]int, depth int, rootPerspective chess.Side, alpha int, table *transpositionTable, results []SearchResult) {
+	results := []rootMoveResult{firstResult}
+	if len(orderedMoves) == 1 {
+		return results
+	}
+
+	alpha := firstResult.score
+	remainingMoves := orderedMoves[1:]
+	if hooks != nil {
+		for _, move := range remainingMoves {
+			results = append(results, rootMoveResult{
+				move:          move,
+				score:         searchRootMove(position, move, depth, rootPerspective, alpha, table, hooks),
+				originalIndex: findMoveIndex(originalMoves, move),
+			})
+		}
+
+		return results
+	}
+
+	remainingResults := make([]rootMoveResult, len(remainingMoves))
 	var wait sync.WaitGroup
-	var mu sync.Mutex
 
-	for _, move := range moves {
-		index := moveIndex[move]
+	for index, move := range remainingMoves {
 		wait.Add(1)
 		go func(index int, move chess.Move) {
 			defer wait.Done()
-
-			score := searchRootMove(position, move, depth, rootPerspective, alpha, table, nil)
-			mu.Lock()
-			results[index] = SearchResult{
-				Move:    move,
-				Score:   score,
-				HasMove: true,
+			remainingResults[index] = rootMoveResult{
+				move:          move,
+				score:         searchRootMove(position, move, depth, rootPerspective, alpha, table, nil),
+				originalIndex: findMoveIndex(originalMoves, move),
 			}
-			mu.Unlock()
 		}(index, move)
 	}
 
 	wait.Wait()
+	return append(results, remainingResults...)
 }
 
-func pickBestResult(results []SearchResult) SearchResult {
-	best := results[0]
-	for index := 1; index < len(results); index++ {
-		if betterScore(results[index].Score, best.Score, true) {
-			best = results[index]
+func findMoveIndex(moves []chess.Move, target chess.Move) int {
+	for index, move := range moves {
+		if move == target {
+			return index
 		}
 	}
 
-	return best
+	panic("move not found in original move list")
+}
+
+func pickBestRootResult(results []rootMoveResult) SearchResult {
+	best := results[0]
+
+	for _, result := range results[1:] {
+		if result.score > best.score || (result.score == best.score && result.originalIndex < best.originalIndex) {
+			best = result
+		}
+	}
+
+	return SearchResult{
+		Move:    best.move,
+		Score:   best.score,
+		HasMove: true,
+	}
 }
 
 func alphaBeta(position chess.Position, depth int, alpha, beta int, rootPerspective chess.Side, table *transpositionTable, hooks *searchHooks) int {
@@ -229,32 +238,12 @@ func alphaBeta(position chess.Position, depth int, alpha, beta int, rootPerspect
 	}
 
 	if depth <= 0 || isTerminalPosition(position) {
-		if hooks != nil {
-			hooks.leafEvaluations++
-		}
-
-		score := Evaluate(position, rootPerspective)
-		table.store(position, ttEntry{
-			depth: depth,
-			score: score,
-			bound: ttExact,
-		})
-		return score
+		return evaluateAndStore(position, depth, rootPerspective, table, hooks)
 	}
 
-	moves := orderedMoves(position, entry.bestMove, hasEntry)
+	moves := orderMoves(position, position.LegalMoves(), entry.bestMove, hasEntry)
 	if len(moves) == 0 {
-		if hooks != nil {
-			hooks.leafEvaluations++
-		}
-
-		score := Evaluate(position, rootPerspective)
-		table.store(position, ttEntry{
-			depth: depth,
-			score: score,
-			bound: ttExact,
-		})
-		return score
+		return evaluateAndStore(position, depth, rootPerspective, table, hooks)
 	}
 
 	maximizing := position.SideToMove() == rootPerspective
@@ -324,11 +313,22 @@ func isTerminalPosition(position chess.Position) bool {
 	return chess.HasInsufficientMaterial(position) || chess.IsFiftyMoveDraw(position)
 }
 
-func orderedMoves(position chess.Position, hashMove chess.Move, hasHashMove bool) []chess.Move {
-	return reorderMoves(position, position.LegalMoves(), hashMove, hasHashMove)
+func evaluateAndStore(position chess.Position, depth int, rootPerspective chess.Side, table *transpositionTable, hooks *searchHooks) int {
+	if hooks != nil {
+		hooks.leafEvaluations++
+	}
+
+	score := Evaluate(position, rootPerspective)
+	table.store(position, ttEntry{
+		depth: depth,
+		score: score,
+		bound: ttExact,
+	})
+
+	return score
 }
 
-func reorderMoves(position chess.Position, moves []chess.Move, hashMove chess.Move, hasHashMove bool) []chess.Move {
+func orderMoves(position chess.Position, moves []chess.Move, hashMove chess.Move, hasHashMove bool) []chess.Move {
 	hashes := make([]chess.Move, 0, 1)
 	promotions := make([]chess.Move, 0, len(moves))
 	captures := make([]chess.Move, 0, len(moves))
