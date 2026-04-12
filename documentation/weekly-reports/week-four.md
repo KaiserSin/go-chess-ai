@@ -20,5 +20,6 @@ Next week I want to keep improving the playing strength of the AI and continue p
 
 | Day | Hours | Description |
 | - | - | - |
-| To be added | - | AI search, evaluation, UI improvements, and documentation |
-| Total | - | |
+| 1 saturday | 10 | AI search, evaluation, UI improvements, and documentation |
+| 2 saturday | 10 | AI search, evaluation, UI improvements, and documentation |
+| Total | 20 | |
