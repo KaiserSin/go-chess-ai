@@ -6,7 +6,7 @@ The largest part of the work was done in the AI layer. I first added a position 
 
 I also improved the evaluation of positions. At first the evaluation only looked at material, but later I added piece square tables and simple positional terms. The current evaluation now includes material, piece placement, pawn structure, king safety, and simple endgame bonuses. This makes the AI less naive than a pure material counter, even though it is still far from a strong chess engine.
 
-Another important part of the week was the user interface. I added a start menu where the player can choose to play as White or Black. I also added AI depth selection and limited the usable depth to a small range so the program stays responsive. When the player chooses Black, the board is rotated so the pieces are shown from the correct side. I also changed the move hint markers so legal target squares are shown as simple dots.
+Another important part of the week was the user interface. I added a start menu where the player can choose to play as White or Black. The project now uses a fixed AI search depth of `3`, so the menu no longer needs a separate depth selector and the response time stays predictable. When the player chooses Black, the board is rotated so the pieces are shown from the correct side. I also changed the move hint markers so legal target squares are shown as simple dots.
 
 The game flow is now closer to a real chess game against a computer. After the player makes a move, the UI first shows that move on the board and only after that the AI replies. This makes the game easier to follow. The hot seat style local play is no longer the main scenario. The program now clearly starts from the side selection menu and then continues as a human versus AI game.
 

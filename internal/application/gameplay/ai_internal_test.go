@@ -3,11 +3,12 @@ package gameplay
 import (
 	"testing"
 
+	"github.com/KaiserSin/go-chess-ai/internal/application/ai"
 	chess "github.com/KaiserSin/go-chess-ai/internal/domain/chess"
 )
 
-func TestApplyAIMoveUsesConfiguredDepth(t *testing.T) {
-	depthOne := newServiceWithGame(mustGameFromPosition(t,
+func TestApplyAIMoveUsesFixedDepth(t *testing.T) {
+	game := mustGameFromPosition(t,
 		chess.NewPositionBuilder().
 			WithSideToMove(chess.White).
 			Place(mustSquareAt(t, 4, 0), chess.White, chess.King).
@@ -16,55 +17,32 @@ func TestApplyAIMoveUsesConfiguredDepth(t *testing.T) {
 			Place(mustSquareAt(t, 4, 7), chess.Black, chess.King).
 			Place(mustSquareAt(t, 3, 7), chess.Black, chess.Queen).
 			Place(mustSquareAt(t, 0, 7), chess.Black, chess.Bishop),
-	))
-	depthOne.SetAISearchDepth(1)
-
-	if err := depthOne.ApplyAIMove(); err != nil {
-		t.Fatalf("depth 1 apply ai move: %v", err)
+	)
+	service := newServiceWithGame(game)
+	before := service.Snapshot()
+	expected := ai.BestMove(game.Position())
+	if !expected.HasMove {
+		t.Fatal("want best move")
 	}
 
-	depthOneSnapshot := depthOne.Snapshot()
-	if square := squareByAlgebraic(t, depthOneSnapshot, "d8"); square.PieceKey != "white-queen" {
-		t.Fatalf("want white-queen on d8 after depth 1, got %q", square.PieceKey)
+	if err := service.ApplyAIMove(); err != nil {
+		t.Fatalf("apply ai move: %v", err)
 	}
 
-	depthTwo := newServiceWithGame(mustGameFromPosition(t,
-		chess.NewPositionBuilder().
-			WithSideToMove(chess.White).
-			Place(mustSquareAt(t, 4, 0), chess.White, chess.King).
-			Place(mustSquareAt(t, 3, 0), chess.White, chess.Queen).
-			Place(mustSquareAt(t, 0, 0), chess.White, chess.Rook).
-			Place(mustSquareAt(t, 4, 7), chess.Black, chess.King).
-			Place(mustSquareAt(t, 3, 7), chess.Black, chess.Queen).
-			Place(mustSquareAt(t, 0, 7), chess.Black, chess.Bishop),
-	))
-	depthTwo.SetAISearchDepth(2)
+	movedPiece := squareByAlgebraic(t, before, expected.Move.From.String()).PieceKey
+	after := service.Snapshot()
 
-	if err := depthTwo.ApplyAIMove(); err != nil {
-		t.Fatalf("depth 2 apply ai move: %v", err)
+	if square := squareByAlgebraic(t, after, expected.Move.From.String()); square.Occupied {
+		t.Fatalf("did not expect piece on %s after ai move", expected.Move.From)
 	}
 
-	depthTwoSnapshot := depthTwo.Snapshot()
-	if square := squareByAlgebraic(t, depthTwoSnapshot, "e2"); square.PieceKey != "white-queen" {
-		t.Fatalf("want white-queen on e2 after depth 2, got %q", square.PieceKey)
+	if square := squareByAlgebraic(t, after, expected.Move.To.String()); square.PieceKey != movedPiece {
+		t.Fatalf("want %s on %s, got %q", movedPiece, expected.Move.To, square.PieceKey)
 	}
 }
 
-func TestSetAISearchDepthClampsToSupportedRange(t *testing.T) {
-	service := NewService()
-
-	service.SetAISearchDepth(0)
-	if service.aiSearchDepth != defaultAISearchDepth {
-		t.Fatalf("want default ai depth %d after zero, got %d", defaultAISearchDepth, service.aiSearchDepth)
-	}
-
-	service.SetAISearchDepth(3)
-	if service.aiSearchDepth != 3 {
-		t.Fatalf("want ai depth 3, got %d", service.aiSearchDepth)
-	}
-
-	service.SetAISearchDepth(9)
-	if service.aiSearchDepth != MaxAISearchDepth {
-		t.Fatalf("want ai depth clamped to %d, got %d", MaxAISearchDepth, service.aiSearchDepth)
+func TestFixedAISearchDepthIsThree(t *testing.T) {
+	if FixedAISearchDepth != 3 {
+		t.Fatalf("want fixed ai depth 3, got %d", FixedAISearchDepth)
 	}
 }

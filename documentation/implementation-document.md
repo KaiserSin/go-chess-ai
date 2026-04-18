@@ -9,8 +9,8 @@ At the moment the program supports
 - full move validation and game state handling
 - check, checkmate, stalemate, castling, en passant, promotion, and draw rules
 - a desktop chess board with mouse interaction
-- a start menu where the user chooses a side and the AI depth
-- AI depth selection in the range `1..5`
+- a start menu where the user chooses a side
+- a fixed AI search depth of `3`
 - an AI based on alpha-beta search, iterative deepening, a transposition table, root-level goroutines, quiescence search, and a simple hand-tuned evaluation function
 
 ## Project structure
@@ -72,8 +72,8 @@ It is better than a pure material count, but it is still simple.
 The program does not yet use an opening book, endgame tablebases, killer heuristic, history heuristic, or time-based search.
 Because of this, the AI is still much weaker than a mature chess engine.
 
-The current search depth is intentionally limited to `5` in the user interface.
-This makes the program easier to use and keeps response time reasonable, but it also limits playing strength.
+The current search depth is intentionally fixed at `3`.
+This keeps response time predictable and simplifies the menu flow, but it also limits playing strength.
 
 The project also does not yet have a dedicated benchmark document.
 Complexity analysis can be given, but there is still no proper measured comparison between different search configurations or evaluation versions.

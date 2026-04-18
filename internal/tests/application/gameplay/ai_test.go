@@ -20,12 +20,12 @@ func TestApplyAIMoveMakesMoveAndChangesTurn(t *testing.T) {
 		t.Fatalf("want black to move, got %q", snapshot.SideToMove)
 	}
 
-	if square := squareByAlgebraic(t, snapshot, "a3"); square.PieceKey != "white-pawn" {
-		t.Fatalf("want white-pawn on a3, got %q", square.PieceKey)
+	if square := squareByAlgebraic(t, snapshot, "c3"); square.PieceKey != "white-knight" {
+		t.Fatalf("want white-knight on c3, got %q", square.PieceKey)
 	}
 
-	if square := squareByAlgebraic(t, snapshot, "a2"); square.Occupied {
-		t.Fatal("did not expect piece on a2")
+	if square := squareByAlgebraic(t, snapshot, "b1"); square.Occupied {
+		t.Fatal("did not expect piece on b1")
 	}
 }
 

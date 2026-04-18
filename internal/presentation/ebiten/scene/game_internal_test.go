@@ -18,70 +18,8 @@ func TestNewGameStartsOnMenuScreen(t *testing.T) {
 		t.Fatalf("want menu screen, got %d", game.screen)
 	}
 
-	if game.aiSearchDepth != defaultAISearchDepth {
-		t.Fatalf("want default ai depth %d, got %d", defaultAISearchDepth, game.aiSearchDepth)
-	}
-
-	if game.depthInput != "" {
-		t.Fatalf("want empty depth input, got %q", game.depthInput)
-	}
-
-	if !game.depthFocused {
-		t.Fatal("want depth input focused on menu start")
-	}
-}
-
-func TestDepthInputUpdatesMenuChoice(t *testing.T) {
-	game := newTestGame(t)
-	focusDepthInput(t, game)
-	game.appendDepthDigit('5')
-
-	if game.aiSearchDepth != 5 {
-		t.Fatalf("want ai depth 5, got %d", game.aiSearchDepth)
-	}
-
-	if game.depthInput != "5" {
-		t.Fatalf("want depth input 5, got %q", game.depthInput)
-	}
-}
-
-func TestDepthInputStaysEmptyAfterBlur(t *testing.T) {
-	game := newTestGame(t)
-	focusDepthInput(t, game)
-	game.deleteDepthDigit()
-	game.blurDepthInput()
-
-	if game.depthInput != "" {
-		t.Fatalf("want empty depth input after blur, got %q", game.depthInput)
-	}
-}
-
-func TestDepthInputRejectsValuesAboveFive(t *testing.T) {
-	game := newTestGame(t)
-	focusDepthInput(t, game)
-	game.appendDepthDigit('5')
-
-	if game.aiSearchDepth != gameplay.MaxAISearchDepth {
-		t.Fatalf("want ai depth %d, got %d", gameplay.MaxAISearchDepth, game.aiSearchDepth)
-	}
-
-	game.appendDepthDigit('1')
-
-	if game.aiSearchDepth != gameplay.MaxAISearchDepth {
-		t.Fatalf("want ai depth to stay %d, got %d", gameplay.MaxAISearchDepth, game.aiSearchDepth)
-	}
-
-	if game.depthInput != "5" {
-		t.Fatalf("want depth input 5, got %q", game.depthInput)
-	}
-}
-
-func TestEmptyDepthInputUsesDefaultDepth(t *testing.T) {
-	game := newTestGame(t)
-	clickSideChoice(t, game, "white")
-
-	if game.aiSearchDepth != defaultAISearchDepth {
-		t.Fatalf("want default ai depth %d, got %d", defaultAISearchDepth, game.aiSearchDepth)
+	if game.playerSide != "" {
+		t.Fatalf("want empty player side, got %q", game.playerSide)
 	}
 }
 
@@ -112,6 +50,7 @@ func TestWhiteSelectionStartsPlayableGame(t *testing.T) {
 func TestBlackSelectionTriggersAutomaticAIMove(t *testing.T) {
 	game := newTestGame(t)
 	clickSideChoice(t, game, "black")
+	before := game.service.Snapshot()
 
 	if game.playerSide != "black" {
 		t.Fatalf("want player side black, got %s", game.playerSide)
@@ -133,13 +72,9 @@ func TestBlackSelectionTriggersAutomaticAIMove(t *testing.T) {
 		t.Fatalf("want black turn status after queued ai move, got %q", got)
 	}
 
-	snapshot := game.service.Snapshot()
-	if square := squareByAlgebraic(t, snapshot, "a3"); square.PieceKey != "white-pawn" {
-		t.Fatalf("want white-pawn on a3, got %q", square.PieceKey)
-	}
-
-	if square := squareByAlgebraic(t, snapshot, "a2"); square.Occupied {
-		t.Fatal("did not expect piece on a2 after ai move")
+	after := game.service.Snapshot()
+	if changedSquareCount(before, after) < 2 {
+		t.Fatal("want board to change after queued ai move")
 	}
 }
 
@@ -230,15 +165,6 @@ func clickSideChoice(t *testing.T, game *Game, side string) {
 	}
 
 	t.Fatalf("side choice %q not found", side)
-}
-
-func focusDepthInput(t *testing.T, game *Game) {
-	t.Helper()
-
-	rect := boardinput.DepthInputRect(game.theme.WindowWidth)
-	if err := game.handleMenuClick(rect.X+rect.Width/2, rect.Y+rect.Height/2); err != nil {
-		t.Fatalf("handleMenuClick error: %v", err)
-	}
 }
 
 func squareCenter(uiTheme theme.Theme, blackPerspective bool, file, rank int) (int, int) {

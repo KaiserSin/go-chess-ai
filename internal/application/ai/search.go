@@ -6,7 +6,10 @@ import (
 	chess "github.com/KaiserSin/go-chess-ai/internal/domain/chess"
 )
 
-const searchInfinity = mateScore + 1
+const (
+	FixedSearchDepth = 3
+	searchInfinity   = mateScore + 1
+)
 
 const (
 	movePriorityPromotion = iota
@@ -39,7 +42,11 @@ type searchHooks struct {
 	ttHits          int
 }
 
-func BuildTree(position chess.Position, depth int) Node {
+func BuildTree(position chess.Position) Node {
+	return buildTree(position, FixedSearchDepth)
+}
+
+func buildTree(position chess.Position, depth int) Node {
 	root := Node{
 		Position: position,
 	}
@@ -60,7 +67,7 @@ func BuildTree(position chess.Position, depth int) Node {
 			panic(err)
 		}
 
-		child := BuildTree(next, depth-1)
+		child := buildTree(next, depth-1)
 		child.Move = move
 		root.Children = append(root.Children, child)
 	}
@@ -68,7 +75,11 @@ func BuildTree(position chess.Position, depth int) Node {
 	return root
 }
 
-func BestMove(position chess.Position, depth int) SearchResult {
+func BestMove(position chess.Position) SearchResult {
+	return bestMove(position, FixedSearchDepth)
+}
+
+func bestMove(position chess.Position, depth int) SearchResult {
 	rootPerspective := position.SideToMove()
 	if depth <= 0 || isTerminalPosition(position) {
 		return noMoveSearchResult(position, rootPerspective)

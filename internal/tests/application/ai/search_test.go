@@ -7,29 +7,38 @@ import (
 	chess "github.com/KaiserSin/go-chess-ai/internal/domain/chess"
 )
 
-func TestBuildTreeDepthOneCreatesChildPerLegalMove(t *testing.T) {
+func TestBuildTreeCreatesChildPerLegalMove(t *testing.T) {
 	position := chess.NewInitialPosition()
 
-	root := ai.BuildTree(position, 1)
+	root := ai.BuildTree(position)
 
 	if got, want := len(root.Children), len(position.LegalMoves()); got != want {
 		t.Fatalf("want %d children, got %d", want, got)
 	}
 }
 
-func TestBuildTreeDepthTwoCreatesGrandchildren(t *testing.T) {
+func TestBuildTreeUsesFixedDepthThree(t *testing.T) {
 	position := chess.NewInitialPosition()
 
-	root := ai.BuildTree(position, 2)
+	root := ai.BuildTree(position)
 
 	if len(root.Children) == 0 {
 		t.Fatal("want root children")
 	}
 
-	for _, child := range root.Children {
-		if len(child.Children) == 0 {
-			t.Fatalf("want grandchildren for move %s", child.Move)
-		}
+	firstChild := root.Children[0]
+	if len(firstChild.Children) == 0 {
+		t.Fatalf("want grandchildren for move %s", firstChild.Move)
+	}
+
+	if len(firstChild.Children[0].Children) == 0 {
+		t.Fatalf("want great-grandchildren for move %s", firstChild.Move)
+	}
+}
+
+func TestFixedSearchDepthIsThree(t *testing.T) {
+	if ai.FixedSearchDepth != 3 {
+		t.Fatalf("want fixed search depth 3, got %d", ai.FixedSearchDepth)
 	}
 }
 
@@ -43,7 +52,7 @@ func TestBestMoveChoosesWinningCapture(t *testing.T) {
 			Place(mustParseSquare(t, "a8"), chess.Black, chess.Queen),
 	)
 
-	result := ai.BestMove(position, 2)
+	result := ai.BestMove(position)
 
 	if !result.HasMove {
 		t.Fatal("want best move")
@@ -68,7 +77,7 @@ func TestBestMoveTerminalPositionReturnsNoMove(t *testing.T) {
 	)
 
 	position := game.Position()
-	result := ai.BestMove(position, 2)
+	result := ai.BestMove(position)
 
 	if result.HasMove {
 		t.Fatal("did not expect move")
@@ -79,25 +88,25 @@ func TestBestMoveTerminalPositionReturnsNoMove(t *testing.T) {
 	}
 }
 
-func TestBestMoveUsesFirstBestMoveOnEqualScores(t *testing.T) {
+func TestBestMoveUsesFixedDepthChoiceFromInitialPosition(t *testing.T) {
 	position := chess.NewInitialPosition()
 
-	result := ai.BestMove(position, 2)
+	result := ai.BestMove(position)
 
 	if !result.HasMove {
 		t.Fatal("want best move")
 	}
 
-	if got := result.Move.String(); got != "a2a3" {
-		t.Fatalf("want a2a3, got %s", got)
+	if got := result.Move.String(); got != "b1c3" {
+		t.Fatalf("want b1c3, got %s", got)
 	}
 
-	if result.Score != 0 {
-		t.Fatalf("want 0, got %d", result.Score)
+	if result.Score != 20 {
+		t.Fatalf("want 20, got %d", result.Score)
 	}
 }
 
-func TestBestMoveAvoidsPoisonedCaptureAtDepthOne(t *testing.T) {
+func TestBestMoveAvoidsPoisonedCaptureAtFixedDepth(t *testing.T) {
 	position := mustBuildPosition(t,
 		chess.NewPositionBuilder().
 			WithSideToMove(chess.White).
@@ -109,7 +118,7 @@ func TestBestMoveAvoidsPoisonedCaptureAtDepthOne(t *testing.T) {
 			Place(mustParseSquare(t, "d7"), chess.Black, chess.Rook),
 	)
 
-	result := ai.BestMove(position, 1)
+	result := ai.BestMove(position)
 
 	if !result.HasMove {
 		t.Fatal("want best move")

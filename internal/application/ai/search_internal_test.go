@@ -34,7 +34,7 @@ func TestBestMoveMatchesSequentialReference(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			want := bestMoveSequential(tt.position, tt.depth)
-			got := BestMove(tt.position, tt.depth)
+			got := bestMove(tt.position, tt.depth)
 
 			if got.HasMove != want.HasMove {
 				t.Fatalf("want HasMove %t, got %t", want.HasMove, got.HasMove)
@@ -51,15 +51,15 @@ func TestBestMoveMatchesSequentialReference(t *testing.T) {
 	}
 }
 
-func TestBestMoveKeepsInitialTieBreak(t *testing.T) {
-	result := BestMove(chess.NewInitialPosition(), 2)
+func TestBestMoveUsesFixedDepthChoiceFromInitialPosition(t *testing.T) {
+	result := BestMove(chess.NewInitialPosition())
 
 	if !result.HasMove {
 		t.Fatal("want best move")
 	}
 
-	if got := result.Move.String(); got != "a2a3" {
-		t.Fatalf("want a2a3, got %s", got)
+	if got := result.Move.String(); got != "b1c3" {
+		t.Fatalf("want b1c3, got %s", got)
 	}
 }
 
@@ -91,7 +91,7 @@ func TestBestMoveMatchesExactDepthHelper(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			want := bestMoveAtDepth(tt.position, tt.depth, newTranspositionTable())
-			got := BestMove(tt.position, tt.depth)
+			got := bestMove(tt.position, tt.depth)
 
 			if got.HasMove != want.HasMove {
 				t.Fatalf("want HasMove %t, got %t", want.HasMove, got.HasMove)
@@ -105,6 +105,12 @@ func TestBestMoveMatchesExactDepthHelper(t *testing.T) {
 				t.Fatalf("want move %s, got %s", want.Move, got.Move)
 			}
 		})
+	}
+}
+
+func TestFixedSearchDepthIsThree(t *testing.T) {
+	if FixedSearchDepth != 3 {
+		t.Fatalf("want fixed search depth 3, got %d", FixedSearchDepth)
 	}
 }
 

@@ -9,16 +9,12 @@ import (
 	"github.com/KaiserSin/go-chess-ai/internal/application/dto"
 )
 
-const (
-	defaultAISearchDepth = 2
-	MaxAISearchDepth     = 5
-)
+const FixedAISearchDepth = ai.FixedSearchDepth
 
 type Service struct {
 	game             *chess.Game
 	selectedSquare   optionalSquare
 	pendingPromotion *pendingPromotion
-	aiSearchDepth    int
 }
 
 type optionalSquare struct {
@@ -33,9 +29,7 @@ type pendingPromotion struct {
 }
 
 func NewService() *Service {
-	service := &Service{
-		aiSearchDepth: defaultAISearchDepth,
-	}
+	service := &Service{}
 	service.NewGame()
 	return service
 }
@@ -153,20 +147,6 @@ func (s *Service) ChoosePromotionByName(pieceType string) error {
 	return s.ChoosePromotion(promotion)
 }
 
-func (s *Service) SetAISearchDepth(depth int) {
-	if depth <= 0 {
-		s.aiSearchDepth = defaultAISearchDepth
-		return
-	}
-
-	if depth > MaxAISearchDepth {
-		s.aiSearchDepth = MaxAISearchDepth
-		return
-	}
-
-	s.aiSearchDepth = depth
-}
-
 func (s *Service) ApplyAIMove() error {
 	if s.game.IsFinished() {
 		return chess.ErrGameFinished
@@ -176,7 +156,7 @@ func (s *Service) ApplyAIMove() error {
 		return chess.ErrInvalidMove
 	}
 
-	result := ai.BestMove(s.game.Position(), s.aiSearchDepth)
+	result := ai.BestMove(s.game.Position())
 	if !result.HasMove {
 		return chess.ErrGameFinished
 	}
@@ -210,8 +190,7 @@ func (s *Service) Snapshot() dto.GameSnapshot {
 
 func newServiceWithGame(game *chess.Game) *Service {
 	return &Service{
-		game:          game,
-		aiSearchDepth: defaultAISearchDepth,
+		game: game,
 	}
 }
 
