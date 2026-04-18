@@ -111,14 +111,15 @@ For terminal positions it checks that the AI returns `HasMove = false`.
 
 ### AI white-box test
 
-One internal AI test is kept under `internal/application/ai/search_internal_test.go`.
-It uses the package-private `bestMove(position, depth)` helper directly.
+White-box AI tests are kept under `internal/application/ai/search_internal_test.go`.
+They use the package-private search helper directly.
 
-The white-box AI test covers
+The white-box AI tests cover
 
-- a curated forced-mate position that requires depth `5`, which is deeper than the fixed runtime depth of `3`
+- returning a legal fallback move when the search deadline is already expired
+- matching results between aspiration search and full-window search at the fixed depth of `3`
 
-This test verifies deeper search behavior without changing the public API or the production search depth.
+These tests verify internal search behavior without exposing any public depth configuration.
 
 ## Rationale
 

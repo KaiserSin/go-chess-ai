@@ -2,36 +2,57 @@ package ai
 
 import (
 	"testing"
+	"time"
 
 	chess "github.com/KaiserSin/go-chess-ai/internal/domain/chess"
 )
 
-func TestBestMoveDepthFiveKeepsForcedMateInThree(t *testing.T) {
+func TestExpiredDeadlineReturnsLegalFallbackMove(t *testing.T) {
 	position := mustBuildPosition(t,
 		chess.NewPositionBuilder().
 			WithSideToMove(chess.White).
-			Place(mustParseSquare(t, "d4"), chess.White, chess.King).
-			Place(mustParseSquare(t, "b2"), chess.White, chess.Queen).
-			Place(mustParseSquare(t, "f2"), chess.White, chess.Knight).
-			Place(mustParseSquare(t, "b5"), chess.Black, chess.King),
+			Place(mustParseSquare(t, "e1"), chess.White, chess.King).
+			Place(mustParseSquare(t, "d1"), chess.White, chess.Queen).
+			Place(mustParseSquare(t, "a1"), chess.White, chess.Rook).
+			Place(mustParseSquare(t, "e8"), chess.Black, chess.King).
+			Place(mustParseSquare(t, "a8"), chess.Black, chess.Rook),
 	)
 
-	if canForceMate(position, 3, chess.White) {
-		t.Fatal("test fixture must require deeper search than the fixed depth")
-	}
-
-	if !canForceMate(position, 5, chess.White) {
-		t.Fatal("test fixture must contain forced mate in three moves")
-	}
-
-	result := bestMove(position, 5)
+	result := bestMoveWithOptions(position, searchOptions{
+		deadline:      time.Now(),
+		useAspiration: true,
+	})
 	if !result.HasMove {
-		t.Fatal("want best move")
+		t.Fatal("want fallback move")
 	}
 
-	next := mustApplyMove(t, position, result.Move)
-	if !canForceMate(next, 4, chess.White) {
-		t.Fatalf("want move that keeps forced mate in three, got %s", result.Move)
+	if !containsMove(position.LegalMoves(), result.Move) {
+		t.Fatalf("want legal fallback move, got %s", result.Move)
+	}
+}
+
+func TestAspirationSearchMatchesFullWindowSearch(t *testing.T) {
+	position := mustBuildPosition(t,
+		chess.NewPositionBuilder().
+			WithSideToMove(chess.White).
+			Place(mustParseSquare(t, "e2"), chess.White, chess.King).
+			Place(mustParseSquare(t, "f2"), chess.White, chess.Queen).
+			Place(mustParseSquare(t, "b5"), chess.White, chess.Rook).
+			Place(mustParseSquare(t, "h4"), chess.Black, chess.King),
+	)
+
+	deadline := time.Now().Add(10 * time.Second)
+	withAspiration := bestMoveWithOptions(position, searchOptions{
+		deadline:      deadline,
+		useAspiration: true,
+	})
+	withoutAspiration := bestMoveWithOptions(position, searchOptions{
+		deadline:      deadline,
+		useAspiration: false,
+	})
+
+	if withAspiration != withoutAspiration {
+		t.Fatalf("want matching search results, with aspiration=%+v without aspiration=%+v", withAspiration, withoutAspiration)
 	}
 }
 
@@ -68,54 +89,12 @@ func mustApplyMove(t *testing.T, position chess.Position, move chess.Move) chess
 	return next
 }
 
-func canForceMate(position chess.Position, plies int, attacker chess.Side) bool {
-	if position.Status() == chess.Checkmate {
-		return position.SideToMove().Opponent() == attacker
-	}
-
-	if isDrawnTerminal(position) || plies == 0 {
-		return false
-	}
-
-	moves := position.LegalMoves()
-	if len(moves) == 0 {
-		return false
-	}
-
-	if position.SideToMove() == attacker {
-		for _, move := range moves {
-			next, err := position.ApplyMove(move)
-			if err != nil {
-				panic(err)
-			}
-
-			if canForceMate(next, plies-1, attacker) {
-				return true
-			}
-		}
-
-		return false
-	}
-
+func containsMove(moves []chess.Move, target chess.Move) bool {
 	for _, move := range moves {
-		next, err := position.ApplyMove(move)
-		if err != nil {
-			panic(err)
-		}
-
-		if !canForceMate(next, plies-1, attacker) {
-			return false
+		if move == target {
+			return true
 		}
 	}
 
-	return true
-}
-
-func isDrawnTerminal(position chess.Position) bool {
-	status := position.Status()
-	if status == chess.Stalemate {
-		return true
-	}
-
-	return chess.HasInsufficientMaterial(position) || chess.IsFiftyMoveDraw(position)
+	return false
 }

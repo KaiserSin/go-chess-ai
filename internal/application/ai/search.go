@@ -1,14 +1,16 @@
 package ai
 
 import (
-	"sync"
+	"time"
 
 	chess "github.com/KaiserSin/go-chess-ai/internal/domain/chess"
 )
 
 const (
-	FixedSearchDepth = 3
-	searchInfinity   = mateScore + 1
+	FixedSearchDepth    = 3
+	searchInfinity      = mateScore + 1
+	aspirationWindow    = 50
+	fullWindowThreshold = searchInfinity
 )
 
 const (
@@ -29,30 +31,26 @@ type rootMoveResult struct {
 	originalIndex int
 }
 
+type searchOptions struct {
+	deadline      time.Time
+	useAspiration bool
+}
+
+type scoreResult struct {
+	score     int
+	completed bool
+}
+
 func BestMove(position chess.Position) SearchResult {
-	return bestMove(position, FixedSearchDepth)
+	return bestMoveWithOptions(position, searchOptions{
+		deadline:      time.Now().Add(fixedSearchTimeBudget()),
+		useAspiration: true,
+	})
 }
 
-func bestMove(position chess.Position, depth int) SearchResult {
+func bestMoveWithOptions(position chess.Position, options searchOptions) SearchResult {
 	rootPerspective := position.SideToMove()
-	if depth <= 0 || isTerminalPosition(position) {
-		return noMoveSearchResult(position, rootPerspective)
-	}
-
-	bestResult := noMoveSearchResult(position, rootPerspective)
-	for currentDepth := 1; currentDepth <= depth; currentDepth++ {
-		result := searchAtDepth(position, currentDepth)
-		if result.HasMove {
-			bestResult = result
-		}
-	}
-
-	return bestResult
-}
-
-func searchAtDepth(position chess.Position, depth int) SearchResult {
-	rootPerspective := position.SideToMove()
-	if depth <= 0 || isTerminalPosition(position) {
+	if isTerminalPosition(position) {
 		return noMoveSearchResult(position, rootPerspective)
 	}
 
@@ -62,7 +60,106 @@ func searchAtDepth(position chess.Position, depth int) SearchResult {
 	}
 
 	orderedMoves := orderMoves(position, originalMoves)
-	return pickBestRootResult(collectRootResults(position, originalMoves, orderedMoves, depth-1, rootPerspective))
+	bestResult := fallbackSearchResult(position, orderedMoves[0], rootPerspective)
+	previousScore := 0
+
+	for currentDepth := 1; currentDepth <= FixedSearchDepth; currentDepth++ {
+		result, completed := searchAtDepth(position, currentDepth, previousScore, options)
+		if !completed {
+			break
+		}
+
+		bestResult = result
+		previousScore = result.Score
+	}
+
+	return bestResult
+}
+
+func fixedSearchTimeBudget() time.Duration {
+	return time.Second * time.Duration(FixedSearchDepth)
+}
+
+func fallbackSearchResult(position chess.Position, move chess.Move, rootPerspective chess.Side) SearchResult {
+	next, err := position.ApplyMove(move)
+	if err != nil {
+		panic(err)
+	}
+
+	return SearchResult{
+		Move:    move,
+		Score:   Evaluate(next, rootPerspective),
+		HasMove: true,
+	}
+}
+
+func searchAtDepth(position chess.Position, depth int, previousScore int, options searchOptions) (SearchResult, bool) {
+	rootPerspective := position.SideToMove()
+	if depth <= 0 || isTerminalPosition(position) {
+		return noMoveSearchResult(position, rootPerspective), true
+	}
+
+	originalMoves := position.LegalMoves()
+	if len(originalMoves) == 0 {
+		return noMoveSearchResult(position, rootPerspective), true
+	}
+
+	if deadlineExceeded(options) {
+		return SearchResult{}, false
+	}
+
+	if !options.useAspiration || depth == 1 {
+		return searchAtDepthWindow(position, depth, -searchInfinity, searchInfinity, options)
+	}
+
+	window := aspirationWindow
+	for {
+		alpha := maxInt(-searchInfinity, previousScore-window)
+		beta := minInt(searchInfinity, previousScore+window)
+
+		result, completed := searchAtDepthWindow(position, depth, alpha, beta, options)
+		if !completed {
+			return SearchResult{}, false
+		}
+
+		if result.Score <= alpha {
+			window *= 2
+			if window >= fullWindowThreshold {
+				return searchAtDepthWindow(position, depth, -searchInfinity, searchInfinity, options)
+			}
+			continue
+		}
+
+		if result.Score >= beta {
+			window *= 2
+			if window >= fullWindowThreshold {
+				return searchAtDepthWindow(position, depth, -searchInfinity, searchInfinity, options)
+			}
+			continue
+		}
+
+		return result, true
+	}
+}
+
+func searchAtDepthWindow(position chess.Position, depth int, alpha, beta int, options searchOptions) (SearchResult, bool) {
+	rootPerspective := position.SideToMove()
+	if depth <= 0 || isTerminalPosition(position) {
+		return noMoveSearchResult(position, rootPerspective), true
+	}
+
+	originalMoves := position.LegalMoves()
+	if len(originalMoves) == 0 {
+		return noMoveSearchResult(position, rootPerspective), true
+	}
+
+	orderedMoves := orderMoves(position, originalMoves)
+	results, completed := collectRootResults(position, originalMoves, orderedMoves, depth-1, rootPerspective, alpha, beta, options)
+	if !completed {
+		return SearchResult{}, false
+	}
+
+	return pickBestRootResult(results), true
 }
 
 func noMoveSearchResult(position chess.Position, rootPerspective chess.Side) SearchResult {
@@ -72,47 +169,49 @@ func noMoveSearchResult(position chess.Position, rootPerspective chess.Side) Sea
 	}
 }
 
-func searchRootMove(position chess.Position, move chess.Move, depth int, rootPerspective chess.Side, alpha int) int {
+func searchRootMove(position chess.Position, move chess.Move, depth int, alpha, beta int, rootPerspective chess.Side, options searchOptions) scoreResult {
+	if deadlineExceeded(options) {
+		return scoreResult{completed: false}
+	}
+
 	next, err := position.ApplyMove(move)
 	if err != nil {
 		panic(err)
 	}
 
-	return alphaBeta(next, depth, alpha, searchInfinity, rootPerspective)
+	return alphaBeta(next, depth, alpha, beta, rootPerspective, options)
 }
 
-func collectRootResults(position chess.Position, originalMoves []chess.Move, orderedMoves []chess.Move, depth int, rootPerspective chess.Side) []rootMoveResult {
-	firstMove := orderedMoves[0]
-	firstResult := rootMoveResult{
-		move:          firstMove,
-		score:         searchRootMove(position, firstMove, depth, rootPerspective, -searchInfinity),
-		originalIndex: findMoveIndex(originalMoves, firstMove),
-	}
+func collectRootResults(position chess.Position, originalMoves []chess.Move, orderedMoves []chess.Move, depth int, rootPerspective chess.Side, alpha, beta int, options searchOptions) ([]rootMoveResult, bool) {
+	results := make([]rootMoveResult, 0, len(orderedMoves))
 
-	results := []rootMoveResult{firstResult}
-	if len(orderedMoves) == 1 {
-		return results
-	}
+	for _, move := range orderedMoves {
+		scored := searchRootMove(position, move, depth, alpha, beta, rootPerspective, options)
+		if !scored.completed {
+			return nil, false
+		}
 
-	alpha := firstResult.score
-	remainingMoves := orderedMoves[1:]
-	remainingResults := make([]rootMoveResult, len(remainingMoves))
-	var wait sync.WaitGroup
+		result := rootMoveResult{
+			move:          move,
+			score:         scored.score,
+			originalIndex: findMoveIndex(originalMoves, move),
+		}
+		results = append(results, result)
 
-	for index, move := range remainingMoves {
-		wait.Add(1)
-		go func(index int, move chess.Move) {
-			defer wait.Done()
-			remainingResults[index] = rootMoveResult{
-				move:          move,
-				score:         searchRootMove(position, move, depth, rootPerspective, alpha),
-				originalIndex: findMoveIndex(originalMoves, move),
+		if rootPerspective == position.SideToMove() {
+			if scored.score > alpha {
+				alpha = scored.score
 			}
-		}(index, move)
+		} else if scored.score < beta {
+			beta = scored.score
+		}
+
+		if alpha >= beta {
+			break
+		}
 	}
 
-	wait.Wait()
-	return append(results, remainingResults...)
+	return results, true
 }
 
 func findMoveIndex(moves []chess.Move, target chess.Move) int {
@@ -141,30 +240,49 @@ func pickBestRootResult(results []rootMoveResult) SearchResult {
 	}
 }
 
-func alphaBeta(position chess.Position, depth int, alpha, beta int, rootPerspective chess.Side) int {
+func alphaBeta(position chess.Position, depth int, alpha, beta int, rootPerspective chess.Side, options searchOptions) scoreResult {
+	if deadlineExceeded(options) {
+		return scoreResult{completed: false}
+	}
+
 	if depth <= 0 || isTerminalPosition(position) {
 		if isTerminalPosition(position) {
-			return evaluateStatic(position, rootPerspective)
+			return scoreResult{
+				score:     evaluateStatic(position, rootPerspective),
+				completed: true,
+			}
 		}
 
-		return quiescence(position, alpha, beta, rootPerspective)
+		return quiescence(position, alpha, beta, rootPerspective, options)
 	}
 
 	moves := orderMoves(position, position.LegalMoves())
 	if len(moves) == 0 {
-		return evaluateStatic(position, rootPerspective)
+		return scoreResult{
+			score:     evaluateStatic(position, rootPerspective),
+			completed: true,
+		}
 	}
 
 	maximizing := position.SideToMove() == rootPerspective
 	bestScore := 0
 
 	for index, move := range moves {
+		if deadlineExceeded(options) {
+			return scoreResult{completed: false}
+		}
+
 		next, err := position.ApplyMove(move)
 		if err != nil {
 			panic(err)
 		}
 
-		score := alphaBeta(next, depth-1, alpha, beta, rootPerspective)
+		result := alphaBeta(next, depth-1, alpha, beta, rootPerspective, options)
+		if !result.completed {
+			return scoreResult{completed: false}
+		}
+
+		score := result.score
 		if index == 0 || betterScore(score, bestScore, maximizing) {
 			bestScore = score
 		}
@@ -182,7 +300,10 @@ func alphaBeta(position chess.Position, depth int, alpha, beta int, rootPerspect
 		}
 	}
 
-	return bestScore
+	return scoreResult{
+		score:     bestScore,
+		completed: true,
+	}
 }
 
 func betterScore(candidate, current int, maximizing bool) bool {
@@ -202,14 +323,18 @@ func isTerminalPosition(position chess.Position) bool {
 	return chess.HasInsufficientMaterial(position) || chess.IsFiftyMoveDraw(position)
 }
 
-func quiescence(position chess.Position, alpha, beta int, rootPerspective chess.Side) int {
+func quiescence(position chess.Position, alpha, beta int, rootPerspective chess.Side, options searchOptions) scoreResult {
+	if deadlineExceeded(options) {
+		return scoreResult{completed: false}
+	}
+
 	standPat := evaluateStatic(position, rootPerspective)
 	maximizing := position.SideToMove() == rootPerspective
 	bestScore := standPat
 
 	if maximizing {
 		if standPat >= beta {
-			return standPat
+			return scoreResult{score: standPat, completed: true}
 		}
 
 		if standPat > alpha {
@@ -217,7 +342,7 @@ func quiescence(position chess.Position, alpha, beta int, rootPerspective chess.
 		}
 	} else {
 		if standPat <= alpha {
-			return standPat
+			return scoreResult{score: standPat, completed: true}
 		}
 
 		if standPat < beta {
@@ -227,12 +352,21 @@ func quiescence(position chess.Position, alpha, beta int, rootPerspective chess.
 
 	moves := tacticalMoves(position)
 	for _, move := range moves {
+		if deadlineExceeded(options) {
+			return scoreResult{completed: false}
+		}
+
 		next, err := position.ApplyMove(move)
 		if err != nil {
 			panic(err)
 		}
 
-		score := quiescence(next, alpha, beta, rootPerspective)
+		result := quiescence(next, alpha, beta, rootPerspective, options)
+		if !result.completed {
+			return scoreResult{completed: false}
+		}
+
+		score := result.score
 		if betterScore(score, bestScore, maximizing) {
 			bestScore = score
 		}
@@ -250,7 +384,10 @@ func quiescence(position chess.Position, alpha, beta int, rootPerspective chess.
 		}
 	}
 
-	return bestScore
+	return scoreResult{
+		score:     bestScore,
+		completed: true,
+	}
 }
 
 func tacticalMoves(position chess.Position) []chess.Move {
@@ -314,4 +451,12 @@ func isCaptureMove(position chess.Position, move chess.Move) bool {
 	}
 
 	return move.From.File() != move.To.File()
+}
+
+func deadlineExceeded(options searchOptions) bool {
+	if options.deadline.IsZero() {
+		return false
+	}
+
+	return !time.Now().Before(options.deadline)
 }

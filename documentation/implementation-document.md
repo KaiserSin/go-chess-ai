@@ -12,7 +12,7 @@ The program supports
 - a desktop chess board with mouse interaction
 - a start menu where the user chooses a side
 - a fixed AI search depth of `3`
-- an AI based on alpha-beta search, iterative deepening, root-level goroutines, quiescence search, and a simple hand-tuned evaluation function
+- an AI based on alpha-beta search, iterative deepening, aspiration windows, quiescence search, a hard time cutoff, and a simple hand-tuned evaluation function
 
 ## Project structure
 
@@ -26,7 +26,7 @@ Main parts of the program
 - `cmd/chess-desktop` starts the desktop program
 - `internal/domain/chess` contains the chess rules, board state, move generation, move validation, and game results
 - `internal/application/gameplay` connects the UI to the chess domain and handles square selection, move attempts, promotion flow, snapshots, and AI move requests
-- `internal/application/ai` contains the search and evaluation code. It includes alpha-beta search, iterative deepening, quiescence search, move ordering, and position evaluation
+- `internal/application/ai` contains the search and evaluation code. It includes alpha-beta search, iterative deepening, aspiration windows, a hard time cutoff, quiescence search, move ordering, and position evaluation
 - `internal/presentation/ebiten` contains the desktop UI, rendering, input translation, board mapping, and theme values
 - `internal/infrastructure/bootstrap` wires the application together and starts the desktop program
 
@@ -41,7 +41,9 @@ The most important algorithms and operations in the project are listed below.
 - Move ordering runs in `O(m)`, where `m` is the number of legal moves in the current position. It groups moves into categories such as promotions, captures, and quiet moves
 - Alpha-beta search has worst-case time complexity `O(b^d)`, where `b` is the branching factor and `d` is the search depth. In practice, move ordering and pruning reduce the number of visited nodes
 - Iterative deepening has the same asymptotic order as the deepest search, but it repeats some work from shallow searches. In practice it still helps because shallow searches can make the final move choice more stable
+- Aspiration windows do not change the asymptotic worst-case order. In practice they can reduce work when the score from the previous depth is a good estimate for the next depth
 - Quiescence search does not have one simple fixed bound in practice. Its cost depends on the number of tactical continuations. It increases search work, but reduces simple tactical blunders
+- Hard time cutoff bounds the wall-clock time of one search call. It does not change worst-case tree shape, but it prevents one search iteration from running indefinitely relative to the configured budget
 
 The main space cost is
 
@@ -54,8 +56,9 @@ The project does not have a separate benchmark document or benchmark suite.
 
 - Plain minimax searches all branches up to depth `d`. Alpha-beta prunes many branches. The worst-case order is still `O(b^d)`, but alpha-beta is much faster in practice
 - Without move ordering, alpha-beta still works, but pruning is weaker. With move ordering, stronger moves are searched first, so cutoffs happen earlier and the running time is better
+- Aspiration windows reuse the previous iterative-deepening score as a narrow initial search window. When that estimate is good, the next depth can be searched with fewer nodes than a full-window search
 - Without quiescence search, the evaluation can stop in unstable tactical positions. With quiescence search, the engine continues searching tactical moves and avoids some simple blunders, even though it increases the amount of work
-- Root-level goroutines do not change the asymptotic complexity, but they can reduce wall-clock time on multi-core hardware
+- Hard time cutoff keeps search latency bounded, but it can also force the engine to return the last fully completed depth instead of the nominal target depth
 
 ## Possible flaws and improvements
 
@@ -68,6 +71,7 @@ Because of this, the AI is still much weaker than a mature chess engine.
 
 The current search depth is intentionally fixed at `3`.
 This keeps response time predictable and simplifies the menu flow, but it also limits playing strength.
+The engine now also uses a hard deadline per search call, so in difficult positions it can stop after the last completed iterative-deepening layer instead of finishing the nominal target depth.
 
 The project also does not have a dedicated benchmark document.
 Complexity analysis can be given, but there is still no proper measured comparison between different search configurations or evaluation versions.
@@ -91,7 +95,6 @@ A Gemini model was used for
 - giving hints about possible improvement directions
 - explaining search algorithms in simple terms
 
-The final code and documentation were still checked in the repository and validated locally.
 The project passes
 
 ```text
