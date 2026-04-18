@@ -142,3 +142,99 @@ func isDrawnTerminal(position chess.Position) bool {
 
 	return chess.HasInsufficientMaterial(position) || chess.IsFiftyMoveDraw(position)
 }
+
+func mustPositionFromMoves(t *testing.T, moves ...chess.Move) chess.Position {
+	t.Helper()
+
+	game := chess.NewGame()
+	applyMoves(t, game, moves...)
+	return game.Position()
+}
+
+func checkmateLossPosition(t *testing.T) chess.Position {
+	t.Helper()
+
+	return mustPositionFromMoves(t,
+		mustMove(t, "f2", "f3"),
+		mustMove(t, "e7", "e5"),
+		mustMove(t, "g2", "g4"),
+		mustMove(t, "d8", "h4"),
+	)
+}
+
+func stalematePosition(t *testing.T) chess.Position {
+	t.Helper()
+
+	return mustBuildPosition(t,
+		chess.NewPositionBuilder().
+			WithSideToMove(chess.Black).
+			Place(mustParseSquare(t, "c6"), chess.White, chess.King).
+			Place(mustParseSquare(t, "b6"), chess.White, chess.Queen).
+			Place(mustParseSquare(t, "a8"), chess.Black, chess.King),
+	)
+}
+
+func immediateMatePosition(t *testing.T) chess.Position {
+	t.Helper()
+
+	return mustBuildPosition(t,
+		chess.NewPositionBuilder().
+			WithSideToMove(chess.White).
+			Place(mustParseSquare(t, "d3"), chess.White, chess.King).
+			Place(mustParseSquare(t, "f2"), chess.White, chess.Knight).
+			Place(mustParseSquare(t, "g1"), chess.White, chess.Queen).
+			Place(mustParseSquare(t, "c1"), chess.Black, chess.King),
+	)
+}
+
+func forcedMateDepthThreePosition(t *testing.T) chess.Position {
+	t.Helper()
+
+	return mustBuildPosition(t,
+		chess.NewPositionBuilder().
+			WithSideToMove(chess.White).
+			Place(mustParseSquare(t, "e2"), chess.White, chess.King).
+			Place(mustParseSquare(t, "f2"), chess.White, chess.Queen).
+			Place(mustParseSquare(t, "b5"), chess.White, chess.Rook).
+			Place(mustParseSquare(t, "h4"), chess.Black, chess.King),
+	)
+}
+
+func poisonedCapturePosition(t *testing.T) chess.Position {
+	t.Helper()
+
+	return mustBuildPosition(t,
+		chess.NewPositionBuilder().
+			WithSideToMove(chess.White).
+			Place(mustParseSquare(t, "g1"), chess.White, chess.King).
+			Place(mustParseSquare(t, "d1"), chess.White, chess.Queen).
+			Place(mustParseSquare(t, "a1"), chess.White, chess.Rook).
+			Place(mustParseSquare(t, "g8"), chess.Black, chess.King).
+			Place(mustParseSquare(t, "d8"), chess.Black, chess.Queen).
+			Place(mustParseSquare(t, "d7"), chess.Black, chess.Rook),
+	)
+}
+
+func onlyLegalMoveUnderCheckPosition(t *testing.T) chess.Position {
+	t.Helper()
+
+	return mustBuildPosition(t,
+		chess.NewPositionBuilder().
+			WithSideToMove(chess.Black).
+			Place(mustParseSquare(t, "d6"), chess.White, chess.King).
+			Place(mustParseSquare(t, "b7"), chess.White, chess.Queen).
+			Place(mustParseSquare(t, "a8"), chess.Black, chess.King),
+	)
+}
+
+func promotionReadyPosition(t *testing.T) chess.Position {
+	t.Helper()
+
+	return mustBuildPosition(t,
+		chess.NewPositionBuilder().
+			WithSideToMove(chess.White).
+			Place(mustParseSquare(t, "e1"), chess.White, chess.King).
+			Place(mustParseSquare(t, "e8"), chess.Black, chess.King).
+			Place(mustParseSquare(t, "g7"), chess.White, chess.Pawn),
+	)
+}

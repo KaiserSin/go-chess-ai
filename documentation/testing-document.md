@@ -14,6 +14,15 @@ The automated tests concentrate on three areas:
 UI and presentation tests are intentionally excluded from the main suite.
 The core value of this project is in the chess logic and the search algorithm, so the tests focus on those parts directly.
 
+## Test Layout
+
+The folder layout stays consistent with the project architecture:
+
+- black-box tests are kept under `internal/tests/...`
+- white-box tests stay next to the code only when package-private access is required
+
+This keeps behavior-oriented tests separate from implementation-specific tests without moving tests between layers unnecessarily.
+
 ## Main Commands
 
 The main automated verification commands are
@@ -21,12 +30,19 @@ The main automated verification commands are
 ```text
 go test ./...
 go test ./internal/...
+make test-ai-extended
+./scripts/coverage.sh
 ```
 
 ## Coverage
 
-The test suite prioritizes representative correctness scenarios over low-level statement coverage.
-The most important question is whether the rules, the application flow, and the AI decisions behave correctly in meaningful chess positions.
+The coverage command reports coverage for the current core packages:
+
+- `internal/domain/chess`
+- `internal/application/gameplay`
+- `internal/application/ai`
+
+The focus stays on representative correctness scenarios rather than rebuilding low-level coverage-only tests.
 
 ## Test Scope
 
@@ -66,21 +82,32 @@ The gameplay suite covers
 
 These tests check the integration between the chess rules and the service layer that the UI uses.
 
-### AI black-box tests
+### AI fast black-box tests
 
 The main AI behavior tests are kept under `internal/tests/application/ai`.
 They use the public `ai.BestMove` entry point and verify the bot from the outside.
 
-The black-box AI suite covers
+The fast black-box AI suite covers
 
 - returning a legal move in the initial position
-- returning `HasMove = false` in a terminal position
+- returning `HasMove = false` in checkmate and stalemate terminal positions
+- returning the only legal move when the side to move is under check
 - choosing an immediate checkmate when one is available
 - finding a forced mate inside the fixed production depth of `3` plies
+- choosing a legal promotion move in a promotion-ready position
 - avoiding a poisoned capture in a tactical position
 
 These scenarios check correctness rather than playing strength alone.
 A chess bot must recognize terminal states, avoid illegal play, and convert a forced mate when the mate is inside its search depth.
+
+### AI extended suite
+
+The project also has a separate deterministic extended AI suite behind the `extended` build tag.
+It is run with `make test-ai-extended`.
+
+The extended suite uses a fixed corpus of opening positions, tactical builder positions, and terminal positions.
+For each non-terminal position it checks that repeated calls to `BestMove` return the same result, that the move is legal, and that the move can be applied successfully.
+For terminal positions it checks that the AI returns `HasMove = false`.
 
 ### AI white-box test
 
@@ -96,6 +123,6 @@ This test verifies deeper search behavior without changing the public API or the
 ## Rationale
 
 The strongest correctness evidence for this project comes from representative chess situations.
-For that reason, the suite emphasizes public rule tests, gameplay integration tests, and curated AI positions with forced mates and tactical traps.
+For that reason, the suite emphasizes public rule tests, gameplay integration tests, curated AI positions with forced mates and tactical traps, and a separate deterministic extended AI corpus.
 
 This gives stronger support for the correctness of the project than a suite focused on rendering details, text formatting, or internal helper functions.

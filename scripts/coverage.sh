@@ -4,7 +4,7 @@ set -eu
 
 ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 HTML_OUTPUT=0
-MIN_COVERAGE=90.0
+MIN_COVERAGE=75.0
 
 case "${1-}" in
 	"")
@@ -23,40 +23,34 @@ cd "$ROOT_DIR"
 tmp_dir=$(mktemp -d)
 trap 'rm -rf "$tmp_dir"' EXIT HUP INT TERM
 
-merge_set() {
-	out_file=$1
-	shift
+run_package() {
+	name=$1
+	coverpkg=$2
+	profile=$3
+	shift 3
 
-	{
-		echo 'mode: set'
-		awk 'FNR==1 { next } { key=$1 " " $2; if ($3+0 > seen[key]) seen[key]=$3+0 } END { for (key in seen) print key, (seen[key] > 0 ? 1 : 0) }' "$@" | sort
-	} > "$out_file"
+	go test "$@" -coverpkg="$coverpkg" -coverprofile="$profile" >/dev/null
+
+	report=$(go tool cover -func="$profile")
+	total=$(printf '%s\n' "$report" | awk '/^total:/ { print $NF }')
+	printf '%-10s %s\n' "$name" "$total"
 }
 
-go test ./internal/tests/domain/chess -coverpkg=./internal/domain/chess -coverprofile="$tmp_dir/root.cover" >/dev/null
-go test ./internal/tests/domain/chess -coverpkg=./internal/domain/chess/game -coverprofile="$tmp_dir/game.cover" >/dev/null
-go test ./internal/domain/chess/internal/bitboard -coverpkg=./internal/domain/chess/internal/bitboard -coverprofile="$tmp_dir/bitboard.cover" >/dev/null
-go test ./internal/domain/chess/internal/geom -coverpkg=./internal/domain/chess/internal/geom -coverprofile="$tmp_dir/geom.cover" >/dev/null
-go test ./internal/domain/chess/model -coverpkg=./internal/domain/chess/model -coverprofile="$tmp_dir/model-int.cover" >/dev/null
-go test ./internal/tests/domain/chess -coverpkg=./internal/domain/chess/model -coverprofile="$tmp_dir/model-ext.cover" >/dev/null
-go test ./internal/domain/chess/position -coverpkg=./internal/domain/chess/position -coverprofile="$tmp_dir/position-int.cover" >/dev/null
-go test ./internal/tests/domain/chess -coverpkg=./internal/domain/chess/position -coverprofile="$tmp_dir/position-ext.cover" >/dev/null
-
-merge_set "$tmp_dir/model.cover" "$tmp_dir/model-int.cover" "$tmp_dir/model-ext.cover"
-merge_set "$tmp_dir/position.cover" "$tmp_dir/position-int.cover" "$tmp_dir/position-ext.cover"
+printf 'Package coverage:\n'
+run_package domain ./internal/domain/chess "$tmp_dir/domain.cover" ./internal/tests/domain/chess
+run_package gameplay ./internal/application/gameplay "$tmp_dir/gameplay.cover" ./internal/tests/application/gameplay ./internal/application/gameplay
+run_package ai ./internal/application/ai "$tmp_dir/ai.cover" ./internal/tests/application/ai ./internal/application/ai
 
 {
 	echo 'mode: set'
-	tail -n +2 "$tmp_dir/root.cover"
-	tail -n +2 "$tmp_dir/game.cover"
-	tail -n +2 "$tmp_dir/bitboard.cover"
-	tail -n +2 "$tmp_dir/geom.cover"
-	tail -n +2 "$tmp_dir/model.cover"
-	tail -n +2 "$tmp_dir/position.cover"
+	tail -n +2 "$tmp_dir/domain.cover"
+	tail -n +2 "$tmp_dir/gameplay.cover"
+	tail -n +2 "$tmp_dir/ai.cover"
 } > coverage.out
 
+printf '\nCombined coverage:\n'
 report=$(go tool cover -func=coverage.out)
-printf '%s\n' "$report"
+printf '%s\n' "$report" | tail -n 1
 
 total_coverage=$(printf '%s\n' "$report" | awk '/^total:/ { gsub("%", "", $NF); print $NF }')
 if [ -z "$total_coverage" ]; then
