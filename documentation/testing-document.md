@@ -1,35 +1,101 @@
 # Testing Document
 
-This document describes the current state of automated testing in the project.
-It is intended to be updated during the course and to give a short overview of coverage and the most important implemented tests at each stage of development.
+The project test suite verifies correctness of the chess rules, the gameplay flow, and the AI behavior.
+The tests focus on functional logic rather than the desktop UI.
 
-## Test Coverage Report
+## Testing Strategy
+
+The automated tests concentrate on three areas:
+
+- chess rule correctness in the domain layer
+- gameplay flow in the application layer
+- AI correctness through representative search scenarios
+
+UI and presentation tests are intentionally excluded from the main suite.
+The core value of this project is in the chess logic and the search algorithm, so the tests focus on those parts directly.
+
+## Main Commands
+
+The main automated verification commands are
 
 ```text
-Command: ./scripts/coverage.sh
-Coverage scope: internal/domain/chess (merged domain coverage report)
-total:                                              (statements)            100.0%
+go test ./...
+go test ./internal/...
 ```
 
-## Current Tests
+## Coverage
 
-The current automated tests are unit tests. They verify the domain logic of the chess engine, the basic behavior of the gameplay layer, and small helper functions in the presentation layer.
+The test suite prioritizes representative correctness scenarios over low-level statement coverage.
+The most important question is whether the rules, the application flow, and the AI decisions behave correctly in meaningful chess positions.
 
-- Verified that the initial gameplay snapshot contains 64 squares, the correct side to move, and the expected starting pieces on selected squares.
-- Verified that selecting a piece marks the selected square and legal target squares correctly, and that selecting the same square again clears the selection.
-- Verified that a legal move updates the board state, changes the side to move, and clears the previous selection state.
-- Verified that a promotion move opens four promotion options in the correct order and that choosing a promotion piece updates the final board state correctly.
-- Verified that the position builder rejects invalid sides, invalid squares, invalid counters, invalid piece types, and illegal positions.
-- Verified that square creation and square parsing accept valid coordinates and reject invalid coordinates.
-- Verified that legal move validation rejects illegal and pinned moves.
-- Verified that castling is accepted only in legal situations, moves the king and rook to the correct squares, and updates castling rights when the king or rook moves.
-- Verified that en passant is accepted only in the correct situations and expires after the allowed move window.
-- Verified that pawn promotion requires a valid promotion piece and rejects invalid promotion attempts.
-- Verified that check, checkmate, and stalemate produce the correct game status and outcome.
-- Verified that threefold repetition, the fifty-move rule, and insufficient material produce the correct draw outcome.
-- Verified that text conversion methods for side, piece type, piece, square, move, status, and outcome reason return the expected string values.
-- Verified that piece sprite loading finds all 12 current piece images and does not return a sprite for an unknown key.
-- Verified that input translation maps screen coordinates to the correct board squares and promotion choices, and rejects clicks outside the board.
-- Verified that the piece catalog returns the correct labels for known piece keys and a safe fallback label for unknown keys.
-- Verified that the board view model keeps the board orientation correct, uses the correct square grid coordinates, highlights selection and legal targets, and places promotion options in the expected order.
-- Verified that sprite placement scales piece images correctly to the size of one board square.
+## Test Scope
+
+### Domain tests
+
+The domain tests are kept under `internal/tests/domain/chess`.
+They verify the public behavior of the chess rules.
+
+The domain suite covers
+
+- legal and illegal move handling
+- castling legality and castling state updates
+- en passant legality and its move window
+- pawn promotion requirements and valid promotion choices
+- check, checkmate, and stalemate detection
+- threefold repetition
+- the fifty-move rule
+- insufficient material detection
+- public draw and query helpers
+
+These tests validate the rules that the rest of the project depends on.
+
+### Gameplay tests
+
+The gameplay tests are kept under `internal/tests/application/gameplay` and `internal/application/gameplay`.
+They verify that the application service uses the chess domain correctly.
+
+The gameplay suite covers
+
+- initial board snapshot contents
+- square selection behavior
+- legal move application and side-to-move changes
+- promotion flow and promotion choice handling
+- AI move application through the gameplay service
+- error handling when the game is already finished
+- error handling when promotion is still pending
+
+These tests check the integration between the chess rules and the service layer that the UI uses.
+
+### AI black-box tests
+
+The main AI behavior tests are kept under `internal/tests/application/ai`.
+They use the public `ai.BestMove` entry point and verify the bot from the outside.
+
+The black-box AI suite covers
+
+- returning a legal move in the initial position
+- returning `HasMove = false` in a terminal position
+- choosing an immediate checkmate when one is available
+- finding a forced mate inside the fixed production depth of `3` plies
+- avoiding a poisoned capture in a tactical position
+
+These scenarios check correctness rather than playing strength alone.
+A chess bot must recognize terminal states, avoid illegal play, and convert a forced mate when the mate is inside its search depth.
+
+### AI white-box test
+
+One internal AI test is kept under `internal/application/ai/search_internal_test.go`.
+It uses the package-private `bestMove(position, depth)` helper directly.
+
+The white-box AI test covers
+
+- a curated forced-mate position that requires depth `5`, which is deeper than the fixed runtime depth of `3`
+
+This test verifies deeper search behavior without changing the public API or the production search depth.
+
+## Rationale
+
+The strongest correctness evidence for this project comes from representative chess situations.
+For that reason, the suite emphasizes public rule tests, gameplay integration tests, and curated AI positions with forced mates and tactical traps.
+
+This gives stronger support for the correctness of the project than a suite focused on rendering details, text formatting, or internal helper functions.

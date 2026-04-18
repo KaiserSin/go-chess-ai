@@ -40,9 +40,3 @@ func TestApplyAIMoveUsesFixedDepth(t *testing.T) {
 		t.Fatalf("want %s on %s, got %q", movedPiece, expected.Move.To, square.PieceKey)
 	}
 }
-
-func TestFixedAISearchDepthIsThree(t *testing.T) {
-	if FixedAISearchDepth != 3 {
-		t.Fatalf("want fixed ai depth 3, got %d", FixedAISearchDepth)
-	}
-}

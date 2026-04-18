@@ -1,31 +1,45 @@
 # Specification Document
 
-## Programming language and peer review
-I am writing the project in the Go language. Also I can review other projects in Python, Java, Kotlin, C++ and JS.
+## Programming Language
 
-## Algorithms and data structures
-The main algorithm of the project is Minimax with alpha beta pruning. I will use the following data structures
-* Bitboards. This means using the uint64 data type for very fast storage of the chess board and pieces state.
-* Game tree for checking possible game states.
-* Built in Go arrays for storing lists of available moves.
+The project is written in Go.
 
-## What problem I solve
-I am creating an artificial intelligence for a chess game. The bot must be able to play against a human calculate the situation several steps ahead and make strong moves. All game logic is written completely from scratch without using ready made chess libraries.
+## Problem Statement
 
-## Program inputs
-The program has a graphical interface. The user clicks on the board and places a piece on the desired square. Then the program checks this move according to the rules of the game and applies it to the virtual board. After that the algorithm calculates its response and the bot also makes its move graphically on the screen.
+The project implements a chess game with an artificial intelligence opponent.
+The bot must evaluate positions, calculate future moves, and choose legal responses against a human player.
+All chess logic is implemented in the project without external chess libraries.
 
-## Expected time and space complexity
-The time complexity of the basic Minimax algorithm is O(b^d) where b is the average number of move options in one situation and d is the search depth. In chess b is usually 35. Alpha beta pruning in the best case reduces this complexity to O(b^(d/2)) because the algorithm ignores bad branches and does not waste time checking them.
+## Algorithms and Data Structures
 
-The space complexity is O(d) where d is the maximum search depth. Memory is spent mostly on the recursion call stack because the algorithm only stores the current board path and not the entire possible game tree.
-## List of sources
-* www.chessprogramming.org
-* en.wikipedia.org/wiki/Minimax
-* en.wikipedia.org/wiki/Alpha%E2%80%93beta_pruning
+The main search algorithm is Minimax with alpha-beta pruning.
+The project uses the following data structures:
 
-## Core of the project
-The core of my project is the implementation of artificial intelligence using the Minimax algorithm with alpha beta pruning. Creating correct moves and a graphical interface are necessary to run the game but the main task and focus of all development is exactly the fast search for the best move and the evaluation of the board position.
+- bitboards based on `uint64` for efficient board representation
+- a game tree explored through recursive search
+- Go slices for storing generated legal moves
 
-## Administrative information
-My study program is TKT. The project documentation language is English.
+## Program Inputs
+
+The program uses a graphical desktop interface.
+The user selects pieces and target squares on the board with the mouse.
+The program validates the move, updates the board state, and then lets the AI calculate and apply its reply.
+
+## Expected Time and Space Complexity
+
+The time complexity of plain Minimax is `O(b^d)`, where `b` is the branching factor and `d` is the search depth.
+Alpha-beta pruning reduces the amount of explored work in practice and in the best case improves the search toward `O(b^(d/2))`.
+
+The space complexity is `O(d)`.
+The main memory cost comes from the recursion stack because the search stores the current line rather than the full tree.
+
+## Core of the Project
+
+The core of the project is the chess AI search and evaluation.
+Correct move generation and the desktop interface are necessary for the full application, but the main technical focus is the search for the best move and the evaluation of board positions.
+
+## Sources
+
+- https://www.chessprogramming.org
+- https://en.wikipedia.org/wiki/Minimax
+- https://en.wikipedia.org/wiki/Alpha%E2%80%93beta_pruning

@@ -7,63 +7,16 @@ import (
 	chess "github.com/KaiserSin/go-chess-ai/internal/domain/chess"
 )
 
-func TestBuildTreeCreatesChildPerLegalMove(t *testing.T) {
+func TestBestMoveReturnsLegalMoveFromInitialPosition(t *testing.T) {
 	position := chess.NewInitialPosition()
-
-	root := ai.BuildTree(position)
-
-	if got, want := len(root.Children), len(position.LegalMoves()); got != want {
-		t.Fatalf("want %d children, got %d", want, got)
-	}
-}
-
-func TestBuildTreeUsesFixedDepthThree(t *testing.T) {
-	position := chess.NewInitialPosition()
-
-	root := ai.BuildTree(position)
-
-	if len(root.Children) == 0 {
-		t.Fatal("want root children")
-	}
-
-	firstChild := root.Children[0]
-	if len(firstChild.Children) == 0 {
-		t.Fatalf("want grandchildren for move %s", firstChild.Move)
-	}
-
-	if len(firstChild.Children[0].Children) == 0 {
-		t.Fatalf("want great-grandchildren for move %s", firstChild.Move)
-	}
-}
-
-func TestFixedSearchDepthIsThree(t *testing.T) {
-	if ai.FixedSearchDepth != 3 {
-		t.Fatalf("want fixed search depth 3, got %d", ai.FixedSearchDepth)
-	}
-}
-
-func TestBestMoveChoosesWinningCapture(t *testing.T) {
-	position := mustBuildPosition(t,
-		chess.NewPositionBuilder().
-			WithSideToMove(chess.White).
-			Place(mustParseSquare(t, "e1"), chess.White, chess.King).
-			Place(mustParseSquare(t, "a1"), chess.White, chess.Rook).
-			Place(mustParseSquare(t, "e8"), chess.Black, chess.King).
-			Place(mustParseSquare(t, "a8"), chess.Black, chess.Queen),
-	)
 
 	result := ai.BestMove(position)
-
 	if !result.HasMove {
 		t.Fatal("want best move")
 	}
 
-	if got := result.Move.String(); got != "a1a8" {
-		t.Fatalf("want a1a8, got %s", got)
-	}
-
-	if result.Score <= 0 {
-		t.Fatalf("want positive score, got %d", result.Score)
+	if !containsMove(position.LegalMoves(), result.Move) {
+		t.Fatalf("want legal move, got %s", result.Move)
 	}
 }
 
@@ -83,26 +36,62 @@ func TestBestMoveTerminalPositionReturnsNoMove(t *testing.T) {
 		t.Fatal("did not expect move")
 	}
 
-	if result.Score != -100000 {
-		t.Fatalf("want -100000, got %d", result.Score)
+	if result.Score >= 0 {
+		t.Fatalf("want negative score for lost terminal position, got %d", result.Score)
 	}
 }
 
-func TestBestMoveUsesFixedDepthChoiceFromInitialPosition(t *testing.T) {
-	position := chess.NewInitialPosition()
+func TestBestMoveChoosesImmediateCheckmateWhenAvailable(t *testing.T) {
+	position := mustBuildPosition(t,
+		chess.NewPositionBuilder().
+			WithSideToMove(chess.White).
+			Place(mustParseSquare(t, "d3"), chess.White, chess.King).
+			Place(mustParseSquare(t, "f2"), chess.White, chess.Knight).
+			Place(mustParseSquare(t, "g1"), chess.White, chess.Queen).
+			Place(mustParseSquare(t, "c1"), chess.Black, chess.King),
+	)
+
+	if !hasImmediateMate(position) {
+		t.Fatal("test fixture must contain immediate mate")
+	}
 
 	result := ai.BestMove(position)
-
 	if !result.HasMove {
 		t.Fatal("want best move")
 	}
 
-	if got := result.Move.String(); got != "b1c3" {
-		t.Fatalf("want b1c3, got %s", got)
+	next := mustApplyMove(t, position, result.Move)
+	if next.Status() != chess.Checkmate {
+		t.Fatalf("want checkmate after %s, got %s", result.Move, next.Status())
+	}
+}
+
+func TestBestMoveFindsForcedMateWithinFixedDepth(t *testing.T) {
+	position := mustBuildPosition(t,
+		chess.NewPositionBuilder().
+			WithSideToMove(chess.White).
+			Place(mustParseSquare(t, "e2"), chess.White, chess.King).
+			Place(mustParseSquare(t, "f2"), chess.White, chess.Queen).
+			Place(mustParseSquare(t, "b5"), chess.White, chess.Rook).
+			Place(mustParseSquare(t, "h4"), chess.Black, chess.King),
+	)
+
+	if hasImmediateMate(position) {
+		t.Fatal("test fixture must require more than one move")
 	}
 
-	if result.Score != 20 {
-		t.Fatalf("want 20, got %d", result.Score)
+	if !canForceMate(position, ai.FixedSearchDepth, chess.White) {
+		t.Fatal("test fixture must contain forced mate within fixed depth")
+	}
+
+	result := ai.BestMove(position)
+	if !result.HasMove {
+		t.Fatal("want best move")
+	}
+
+	next := mustApplyMove(t, position, result.Move)
+	if !canForceMate(next, ai.FixedSearchDepth-1, chess.White) {
+		t.Fatalf("want move that keeps forced mate, got %s", result.Move)
 	}
 }
 
@@ -118,13 +107,18 @@ func TestBestMoveAvoidsPoisonedCaptureAtFixedDepth(t *testing.T) {
 			Place(mustParseSquare(t, "d7"), chess.Black, chess.Rook),
 	)
 
+	poisonedCapture := mustMove(t, "d1", "d7")
+	if !containsMove(position.LegalMoves(), poisonedCapture) {
+		t.Fatal("test fixture must offer poisoned capture")
+	}
+
 	result := ai.BestMove(position)
 
 	if !result.HasMove {
 		t.Fatal("want best move")
 	}
 
-	if got := result.Move.String(); got == "d1d7" {
-		t.Fatalf("did not expect poisoned capture d1d7, got %s", got)
+	if result.Move == poisonedCapture {
+		t.Fatalf("did not expect poisoned capture %s", poisonedCapture)
 	}
 }

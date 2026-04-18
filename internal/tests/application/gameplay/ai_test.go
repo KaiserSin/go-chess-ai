@@ -4,12 +4,18 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/KaiserSin/go-chess-ai/internal/application/ai"
 	"github.com/KaiserSin/go-chess-ai/internal/application/gameplay"
 	chess "github.com/KaiserSin/go-chess-ai/internal/domain/chess"
 )
 
 func TestApplyAIMoveMakesMoveAndChangesTurn(t *testing.T) {
 	service := gameplay.NewService()
+	before := service.Snapshot()
+	expected := ai.BestMove(chess.NewInitialPosition())
+	if !expected.HasMove {
+		t.Fatal("want best move for initial position")
+	}
 
 	if err := service.ApplyAIMove(); err != nil {
 		t.Fatalf("want ai move, got %v", err)
@@ -20,12 +26,13 @@ func TestApplyAIMoveMakesMoveAndChangesTurn(t *testing.T) {
 		t.Fatalf("want black to move, got %q", snapshot.SideToMove)
 	}
 
-	if square := squareByAlgebraic(t, snapshot, "c3"); square.PieceKey != "white-knight" {
-		t.Fatalf("want white-knight on c3, got %q", square.PieceKey)
+	movedPiece := squareByAlgebraic(t, before, expected.Move.From.String()).PieceKey
+	if square := squareByAlgebraic(t, snapshot, expected.Move.From.String()); square.Occupied {
+		t.Fatalf("did not expect piece on %s after ai move", expected.Move.From)
 	}
 
-	if square := squareByAlgebraic(t, snapshot, "b1"); square.Occupied {
-		t.Fatal("did not expect piece on b1")
+	if square := squareByAlgebraic(t, snapshot, expected.Move.To.String()); square.PieceKey != movedPiece {
+		t.Fatalf("want %s on %s, got %q", movedPiece, expected.Move.To, square.PieceKey)
 	}
 }
 

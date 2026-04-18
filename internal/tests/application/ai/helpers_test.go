@@ -1,39 +1,10 @@
-package ai
+package ai_test
 
 import (
 	"testing"
 
 	chess "github.com/KaiserSin/go-chess-ai/internal/domain/chess"
 )
-
-func TestBestMoveDepthFiveKeepsForcedMateInThree(t *testing.T) {
-	position := mustBuildPosition(t,
-		chess.NewPositionBuilder().
-			WithSideToMove(chess.White).
-			Place(mustParseSquare(t, "d4"), chess.White, chess.King).
-			Place(mustParseSquare(t, "b2"), chess.White, chess.Queen).
-			Place(mustParseSquare(t, "f2"), chess.White, chess.Knight).
-			Place(mustParseSquare(t, "b5"), chess.Black, chess.King),
-	)
-
-	if canForceMate(position, 3, chess.White) {
-		t.Fatal("test fixture must require deeper search than the fixed depth")
-	}
-
-	if !canForceMate(position, 5, chess.White) {
-		t.Fatal("test fixture must contain forced mate in three moves")
-	}
-
-	result := bestMove(position, 5)
-	if !result.HasMove {
-		t.Fatal("want best move")
-	}
-
-	next := mustApplyMove(t, position, result.Move)
-	if !canForceMate(next, 4, chess.White) {
-		t.Fatalf("want move that keeps forced mate in three, got %s", result.Move)
-	}
-}
 
 func mustBuildPosition(t *testing.T, builder *chess.PositionBuilder) chess.Position {
 	t.Helper()
@@ -57,6 +28,41 @@ func mustParseSquare(t *testing.T, raw string) chess.Square {
 	return square
 }
 
+func mustMove(t *testing.T, from, to string, promotion ...chess.PieceType) chess.Move {
+	t.Helper()
+
+	move := chess.Move{
+		From: mustParseSquare(t, from),
+		To:   mustParseSquare(t, to),
+	}
+
+	if len(promotion) > 0 {
+		move.Promotion = promotion[0]
+	}
+
+	return move
+}
+
+func applyMoves(t *testing.T, game *chess.Game, moves ...chess.Move) {
+	t.Helper()
+
+	for _, move := range moves {
+		if err := game.ApplyMove(move); err != nil {
+			t.Fatalf("ApplyMove(%s) error: %v", move, err)
+		}
+	}
+}
+
+func containsMove(moves []chess.Move, target chess.Move) bool {
+	for _, move := range moves {
+		if move == target {
+			return true
+		}
+	}
+
+	return false
+}
+
 func mustApplyMove(t *testing.T, position chess.Position, move chess.Move) chess.Position {
 	t.Helper()
 
@@ -66,6 +72,23 @@ func mustApplyMove(t *testing.T, position chess.Position, move chess.Move) chess
 	}
 
 	return next
+}
+
+func hasImmediateMate(position chess.Position) bool {
+	attacker := position.SideToMove()
+
+	for _, move := range position.LegalMoves() {
+		next, err := position.ApplyMove(move)
+		if err != nil {
+			panic(err)
+		}
+
+		if next.Status() == chess.Checkmate && next.SideToMove().Opponent() == attacker {
+			return true
+		}
+	}
+
+	return false
 }
 
 func canForceMate(position chess.Position, plies int, attacker chess.Side) bool {
