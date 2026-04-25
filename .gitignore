@@ -1,4 +1,7 @@
 documentation/architecture.md
+.idea/
+.vscode/
+*.test
 coverage.out
 coverage.html
 chess-desktop

@@ -6,7 +6,7 @@ import (
 	chess "github.com/KaiserSin/go-chess-ai/internal/domain/chess"
 )
 
-func mustBuildPosition(t *testing.T, builder *chess.PositionBuilder) chess.Position {
+func mustBuildPosition(t testing.TB, builder *chess.PositionBuilder) chess.Position {
 	t.Helper()
 
 	position, err := builder.Build()
@@ -17,7 +17,7 @@ func mustBuildPosition(t *testing.T, builder *chess.PositionBuilder) chess.Posit
 	return position
 }
 
-func mustParseSquare(t *testing.T, raw string) chess.Square {
+func mustParseSquare(t testing.TB, raw string) chess.Square {
 	t.Helper()
 
 	square, err := chess.ParseSquare(raw)
@@ -28,7 +28,7 @@ func mustParseSquare(t *testing.T, raw string) chess.Square {
 	return square
 }
 
-func mustMove(t *testing.T, from, to string, promotion ...chess.PieceType) chess.Move {
+func mustMove(t testing.TB, from, to string, promotion ...chess.PieceType) chess.Move {
 	t.Helper()
 
 	move := chess.Move{
@@ -43,7 +43,7 @@ func mustMove(t *testing.T, from, to string, promotion ...chess.PieceType) chess
 	return move
 }
 
-func applyMoves(t *testing.T, game *chess.Game, moves ...chess.Move) {
+func applyMoves(t testing.TB, game *chess.Game, moves ...chess.Move) {
 	t.Helper()
 
 	for _, move := range moves {
@@ -63,7 +63,7 @@ func containsMove(moves []chess.Move, target chess.Move) bool {
 	return false
 }
 
-func mustApplyMove(t *testing.T, position chess.Position, move chess.Move) chess.Position {
+func mustApplyMove(t testing.TB, position chess.Position, move chess.Move) chess.Position {
 	t.Helper()
 
 	next, err := position.ApplyMove(move)
@@ -143,7 +143,7 @@ func isDrawnTerminal(position chess.Position) bool {
 	return chess.HasInsufficientMaterial(position) || chess.IsFiftyMoveDraw(position)
 }
 
-func mustPositionFromMoves(t *testing.T, moves ...chess.Move) chess.Position {
+func mustPositionFromMoves(t testing.TB, moves ...chess.Move) chess.Position {
 	t.Helper()
 
 	game := chess.NewGame()
@@ -151,7 +151,7 @@ func mustPositionFromMoves(t *testing.T, moves ...chess.Move) chess.Position {
 	return game.Position()
 }
 
-func checkmateLossPosition(t *testing.T) chess.Position {
+func checkmateLossPosition(t testing.TB) chess.Position {
 	t.Helper()
 
 	return mustPositionFromMoves(t,
@@ -162,7 +162,7 @@ func checkmateLossPosition(t *testing.T) chess.Position {
 	)
 }
 
-func stalematePosition(t *testing.T) chess.Position {
+func stalematePosition(t testing.TB) chess.Position {
 	t.Helper()
 
 	return mustBuildPosition(t,
@@ -174,7 +174,7 @@ func stalematePosition(t *testing.T) chess.Position {
 	)
 }
 
-func immediateMatePosition(t *testing.T) chess.Position {
+func immediateMatePosition(t testing.TB) chess.Position {
 	t.Helper()
 
 	return mustBuildPosition(t,
@@ -187,7 +187,7 @@ func immediateMatePosition(t *testing.T) chess.Position {
 	)
 }
 
-func forcedMateDepthThreePosition(t *testing.T) chess.Position {
+func forcedMateDepthThreePosition(t testing.TB) chess.Position {
 	t.Helper()
 
 	return mustBuildPosition(t,
@@ -200,7 +200,7 @@ func forcedMateDepthThreePosition(t *testing.T) chess.Position {
 	)
 }
 
-func poisonedCapturePosition(t *testing.T) chess.Position {
+func poisonedCapturePosition(t testing.TB) chess.Position {
 	t.Helper()
 
 	return mustBuildPosition(t,
@@ -215,7 +215,7 @@ func poisonedCapturePosition(t *testing.T) chess.Position {
 	)
 }
 
-func onlyLegalMoveUnderCheckPosition(t *testing.T) chess.Position {
+func onlyLegalMoveUnderCheckPosition(t testing.TB) chess.Position {
 	t.Helper()
 
 	return mustBuildPosition(t,
@@ -227,7 +227,7 @@ func onlyLegalMoveUnderCheckPosition(t *testing.T) chess.Position {
 	)
 }
 
-func promotionReadyPosition(t *testing.T) chess.Position {
+func promotionReadyPosition(t testing.TB) chess.Position {
 	t.Helper()
 
 	return mustBuildPosition(t,

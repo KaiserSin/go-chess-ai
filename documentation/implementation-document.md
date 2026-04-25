@@ -51,14 +51,28 @@ The main space cost is
 
 ## Performance and O-analysis comparison
 
-This comparison is mostly theoretical.
-The project does not have a separate benchmark document or benchmark suite.
+This comparison combines theoretical analysis with a small local benchmark for `BestMove`.
 
 - Plain minimax searches all branches up to depth `d`. Alpha-beta prunes many branches. The worst-case order is still `O(b^d)`, but alpha-beta is much faster in practice
 - Without move ordering, alpha-beta still works, but pruning is weaker. With move ordering, stronger moves are searched first, so cutoffs happen earlier and the running time is better
 - Aspiration windows reuse the previous iterative-deepening score as a narrow initial search window. When that estimate is good, the next depth can be searched with fewer nodes than a full-window search
 - Without quiescence search, the evaluation can stop in unstable tactical positions. With quiescence search, the engine continues searching tactical moves and avoids some simple blunders, even though it increases the amount of work
 - Hard time cutoff keeps search latency bounded, but it can also force the engine to return the last fully completed depth instead of the nominal target depth
+
+## Performance measurements
+
+The following measurements were run locally on Apple M4 with Go `1.26.1` on darwin arm64.
+The command was `go test -bench BenchmarkBestMove -run '^$' ./internal/tests/application/ai`.
+The numbers are practical measurements for the current fixed search depth of `3`.
+They are not a formal proof of time complexity and can vary on another computer.
+
+| Position | Time per `BestMove` |
+| - | - |
+| Initial position | about 122 ms |
+| Opening after four moves | about 283 ms |
+| Poisoned capture tactic | about 60 ms |
+| Forced mate at depth three | about 488 ms |
+| Promotion-ready position | about 4.4 ms |
 
 ## Possible flaws and improvements
 
@@ -73,8 +87,8 @@ The current search depth is intentionally fixed at `3`.
 This keeps response time predictable and simplifies the menu flow, but it also limits playing strength.
 The engine now also uses a hard deadline per search call, so in difficult positions it can stop after the last completed iterative-deepening layer instead of finishing the nominal target depth.
 
-The project also does not have a dedicated benchmark document.
-Complexity analysis can be given, but there is still no proper measured comparison between different search configurations or evaluation versions.
+The project has only a small local benchmark table.
+There is still no broad measured comparison between different search configurations or evaluation versions.
 
 Possible future improvements
 
@@ -82,7 +96,7 @@ Possible future improvements
 - add time-based search and time management
 - add killer and history heuristics
 - improve the evaluation function with more positional terms
-- create benchmark measurements for different depths and search variants
+- create broader benchmark measurements for different depths and search variants
 - add endgame tablebases or more endgame-specific knowledge
 
 ## Use of language models
