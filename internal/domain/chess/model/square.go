@@ -47,34 +47,3 @@ func (s Square) String() string {
 func (s Square) isValid() bool {
 	return int(s) < boardFiles*boardRanks
 }
-
-func (s Square) bitboard() uint64 {
-	return uint64(1) << s
-}
-
-func (s Square) offset(fileDelta, rankDelta int) (Square, bool) {
-	if !s.isValid() {
-		return 0, false
-	}
-
-	file := s.File() + fileDelta
-	rank := s.Rank() + rankDelta
-	if file < 0 || file >= boardFiles || rank < 0 || rank >= boardRanks {
-		return 0, false
-	}
-
-	return Square(rank*boardFiles + file), true
-}
-
-func (s Square) color() int {
-	return (s.File() + s.Rank()) % 2
-}
-
-func mustSquare(file, rank int) Square {
-	square, err := NewSquare(file, rank)
-	if err != nil {
-		panic(err)
-	}
-
-	return square
-}

@@ -105,10 +105,10 @@ go test ./...
 
 Only sources that had real relevance for the project are listed here.
 
-- Chessprogramming Wiki https://www.chessprogramming.org/Minimax
-- Chessprogramming Wiki https://www.chessprogramming.org/Alpha-Beta
-- Chessprogramming Wiki https://www.chessprogramming.org/Move_Ordering
-- Chessprogramming Wiki https://www.chessprogramming.org/Iterative_Deepening
-- Chessprogramming Wiki https://www.chessprogramming.org/Quiescence_Search
-- Wikipedia https://en.wikipedia.org/wiki/Minimax
-- Wikipedia https://en.wikipedia.org/wiki/Alpha%E2%80%93beta_pruning
+- Chessprogramming Wiki www.chessprogramming.org/Minimax
+- Chessprogramming Wiki www.chessprogramming.org/Alpha-Beta
+- Chessprogramming Wiki www.chessprogramming.org/Move_Ordering
+- Chessprogramming Wiki www.chessprogramming.org/Iterative_Deepening
+- Chessprogramming Wiki www.chessprogramming.org/Quiescence_Search
+- Wikipedia en.wikipedia.org/wiki/Minimax
+- Wikipedia en.wikipedia.org/wiki/Alpha%E2%80%93beta_pruning

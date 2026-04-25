@@ -78,17 +78,6 @@ func mustParseSquare(t *testing.T, raw string) chess.Square {
 	return square
 }
 
-func mustApplyMove(t *testing.T, position chess.Position, move chess.Move) chess.Position {
-	t.Helper()
-
-	next, err := position.ApplyMove(move)
-	if err != nil {
-		t.Fatalf("ApplyMove(%s) error: %v", move, err)
-	}
-
-	return next
-}
-
 func containsMove(moves []chess.Move, target chess.Move) bool {
 	for _, move := range moves {
 		if move == target {

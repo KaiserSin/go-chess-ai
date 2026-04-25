@@ -15,11 +15,3 @@ func (m Move) String() string {
 
 	return fmt.Sprintf("%s%s=%s", m.From, m.To, m.Promotion.symbol())
 }
-
-func (m Move) validateSquares() error {
-	if !m.From.isValid() || !m.To.isValid() {
-		return ErrInvalidSquare
-	}
-
-	return nil
-}

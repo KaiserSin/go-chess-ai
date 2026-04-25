@@ -5,7 +5,7 @@ The tests focus on functional logic rather than the desktop UI.
 
 ## Testing Strategy
 
-The automated tests concentrate on three areas:
+The automated tests concentrate on three areas
 
 - chess rule correctness in the domain layer
 - gameplay flow in the application layer
@@ -16,12 +16,18 @@ The core value of this project is in the chess logic and the search algorithm, s
 
 ## Test Layout
 
-The folder layout stays consistent with the project architecture:
+The folder layout stays consistent with the project architecture
 
 - black-box tests are kept under `internal/tests/...`
 - white-box tests stay next to the code only when package-private access is required
 
 This keeps behavior-oriented tests separate from implementation-specific tests without moving tests between layers unnecessarily.
+
+The separate `internal/tests` folder is used for tests that look at the project from the outside.
+These tests call the same public functions that the rest of the program uses.
+Because of this they show that the real behavior works, not only private helper functions.
+Some AI tests stay next to the AI code because they need direct access to internal search and evaluation logic.
+This keeps normal behavior tests clean while still making it possible to test difficult AI details directly.
 
 ## Main Commands
 
@@ -31,16 +37,32 @@ The main automated verification commands are
 go test ./...
 go test ./internal/...
 make test-ai-extended
+make coverage
 ./scripts/coverage.sh
 ```
 
 ## Coverage
 
-The coverage command reports coverage for the current core packages:
+The coverage command reports coverage for the current core packages
 
 - `internal/domain/chess`
 - `internal/application/gameplay`
 - `internal/application/ai`
+
+Current coverage report from `make coverage`
+
+```text
+Package coverage
+domain     100.0%
+gameplay   76.6%
+ai         90.2%
+
+Combined coverage
+total statements 86.6%
+```
+
+The coverage script combines the core package reports and enforces at least `75.0%` combined statement coverage.
+Presentation code is not included in this target because the project tests focus on chess rules, gameplay state, and AI behavior rather than rendering.
 
 The focus stays on representative correctness scenarios rather than rebuilding low-level coverage-only tests.
 
@@ -109,17 +131,39 @@ The extended suite uses a fixed corpus of opening positions, tactical builder po
 For each non-terminal position it checks that repeated calls to `BestMove` return the same result, that the move is legal, and that the move can be applied successfully.
 For terminal positions it checks that the AI returns `HasMove = false`.
 
-### AI white-box test
+### AI white-box tests
 
-White-box AI tests are kept under `internal/application/ai/search_internal_test.go`.
-They use the package-private search helper directly.
+White-box AI tests are kept under `internal/application/ai`.
+They use package-private helpers directly when this makes the tested behavior clearer.
 
 The white-box AI tests cover
 
 - returning a legal fallback move when the search deadline is already expired
 - matching results between aspiration search and full-window search at the fixed depth of `3`
+- evaluating material advantage directly
+- checking that White and Black perspectives produce opposite evaluation signs
+- rewarding stronger piece placement on the board
+- penalizing weak pawn structure
+- rewarding king shield in middlegame positions
+- rewarding active king placement in endgames
 
-These tests verify internal search behavior without exposing any public depth configuration.
+These tests verify internal search and evaluation behavior without exposing extra public configuration.
+
+## Representative Scenarios
+
+The most important test inputs are chosen to cover correctness properties that matter for a chess AI project.
+
+- Initial position AI move verifies that the AI can search a normal high-branching chess position and still return a legal move.
+- Terminal checkmate and stalemate positions verify that the AI recognizes finished games and does not invent moves when none should be played.
+- Only legal move while in check verifies that move generation and AI selection respect forced defensive positions.
+- Immediate checkmate verifies that the AI chooses a winning tactical move when mate is directly available.
+- Forced mate within fixed depth `3` verifies that the search can find a forced win inside the actual production search depth.
+- Poisoned capture position verifies that the AI is not only greedy about material and can avoid a capture that loses tactically.
+- Promotion-ready position verifies that the AI can return a legal promotion move and that the promoted piece appears on the expected square.
+- Direct evaluation positions verify that the heuristic rewards material, piece placement, pawn structure, king safety, and endgame king activity in controlled positions.
+- Castling, en passant, promotion, repetition, fifty-move rule, and insufficient material domain tests verify the non-trivial chess rules that the AI and gameplay service rely on.
+- Gameplay promotion and AI service tests verify that the application layer handles user-facing state transitions such as pending promotion, finished games, and AI replies.
+- Extended deterministic AI corpus verifies repeated AI calls on opening, tactical, and terminal positions so that legal move selection stays deterministic and repeatable.
 
 ## Rationale
 

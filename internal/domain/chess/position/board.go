@@ -109,18 +109,6 @@ func (b *Board) removePiece(square chessmodel.Square) (chessmodel.Piece, bool) {
 	return chessmodel.Piece{}, false
 }
 
-func (b *Board) movePiece(from, to chessmodel.Square) (chessmodel.Piece, chessmodel.Piece, bool) {
-	piece, ok := b.removePiece(from)
-	if !ok {
-		return chessmodel.Piece{}, chessmodel.Piece{}, false
-	}
-
-	captured, _ := b.removePiece(to)
-	b.placePiece(piece, to)
-
-	return piece, captured, true
-}
-
 func (b Board) occupied(square chessmodel.Square) bool {
 	return b.all&squareBitboard(square) != 0
 }

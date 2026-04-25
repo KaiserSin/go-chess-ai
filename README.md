@@ -1,64 +1,61 @@
 # Go Chess AI
 
-This project is a chess application written in Go. It includes the chess rules, a desktop board built with Ebiten, and the base structure for a future AI player.
+Go Chess AI is a desktop chess application written in Go.
+The project includes a full chess rule implementation, a graphical board built with Ebiten, and a human versus AI game mode.
 
-## Install Go
+The chess logic is implemented without external chess libraries.
+The AI uses a fixed search depth of `3` and is based on alpha-beta search with iterative deepening, aspiration windows, quiescence search, move ordering, and a hand-tuned positional evaluation function.
 
-Official Go installation guide
+## Features
 
-- https://go.dev/doc/install
+- playable desktop chess board with mouse input
+- side selection before the game starts
+- legal move validation for all pieces
+- check, checkmate, and stalemate detection
+- castling, en passant, pawn promotion, and common draw rules
+- AI opponent with fixed-depth search and positional evaluation
+- automated tests for chess rules, gameplay flow, and AI behavior
 
-### macOS
+## Documentation
 
-1. Download the macOS installer package from `https://go.dev/dl/`
-2. Open the `.pkg` file and follow the installer steps
-3. Reopen Terminal
-4. Check that Go is installed
+- [Specification document](documentation/specification.md)
+- [User guide](documentation/user-guide.md)
+- [Implementation document](documentation/implementation-document.md)
+- [Testing document](documentation/testing-document.md)
+- [Architecture overview](documentation/architecture.md)
+- Weekly reports
+  - [Week 1](documentation/weekly-reports/week-one.md)
+  - [Week 2](documentation/weekly-reports/week-two.md)
+  - [Week 3](documentation/weekly-reports/week-three.md)
+  - [Week 4](documentation/weekly-reports/week-four.md)
+  - [Week 5](documentation/weekly-reports/week-five.md)
 
-```bash
-go version
-```
+## Quick Start
 
-### Linux
-
-1. Download the Linux archive from `https://go.dev/dl/`
-2. Remove any old Go folder from `/usr/local/go`
-3. Extract the new archive into `/usr/local`
-4. Add `/usr/local/go/bin` to your `PATH`
-5. Open a new terminal or reload your shell profile
-6. Check that Go is installed
-
-```bash
-go version
-```
-
-Example `PATH` line
-
-```bash
-export PATH=$PATH:/usr/local/go/bin
-```
-
-### Windows
-
-1. Download the Windows `.msi` installer from `https://go.dev/dl/`
-2. Open the installer and follow the steps
-3. Reopen Command Prompt or PowerShell
-4. Check that Go is installed
-
-```bash
-go version
-```
-
-## Run the project
-
-After Go is installed, start the application with
+Install Go `1.26`, clone the repository, and run the desktop application from the repository root
 
 ```bash
 make run
 ```
 
-To see the other available commands, run
+For full installation, gameplay, input, and command instructions, see the [User guide](documentation/user-guide.md).
+
+Run the main automated test suite with
 
 ```bash
-make help
+make test
+```
+
+Other development commands are listed in the user guide and in `make help`.
+
+## Project Structure
+
+```text
+cmd/chess-desktop/              desktop entry point
+internal/domain/chess/          chess rules and board state
+internal/application/ai/        search and evaluation logic
+internal/application/gameplay/  gameplay service used by the UI
+internal/presentation/ebiten/   desktop rendering and input handling
+internal/tests/                 black-box domain and application tests
+documentation/                  course documentation and weekly reports
 ```
