@@ -22,7 +22,6 @@ The AI uses a fixed search depth of `3` and is based on alpha-beta search with i
 - [User guide](documentation/user-guide.md)
 - [Implementation document](documentation/implementation-document.md)
 - [Testing document](documentation/testing-document.md)
-- [Architecture overview](documentation/architecture.md)
 - Weekly reports
   - [Week 1](documentation/weekly-reports/week-one.md)
   - [Week 2](documentation/weekly-reports/week-two.md)

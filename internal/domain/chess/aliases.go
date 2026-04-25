@@ -7,17 +7,29 @@ import (
 )
 
 type Side = chessmodel.Side
+
 type PieceType = chessmodel.PieceType
+
 type Piece = chessmodel.Piece
+
 type Square = chessmodel.Square
+
 type Move = chessmodel.Move
+
 type CastlingRights = chessmodel.CastlingRights
+
 type Status = chessmodel.Status
+
 type OutcomeReason = chessmodel.OutcomeReason
+
 type Outcome = chessmodel.Outcome
+
 type Position = chessposition.Position
+
 type PositionBuilder = chessposition.PositionBuilder
+
 type RepetitionKey = chessposition.RepetitionKey
+
 type Game = chessgame.Game
 
 const (

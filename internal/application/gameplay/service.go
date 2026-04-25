@@ -9,8 +9,6 @@ import (
 	"github.com/KaiserSin/go-chess-ai/internal/application/dto"
 )
 
-const FixedAISearchDepth = ai.FixedSearchDepth
-
 type Service struct {
 	game             *chess.Game
 	selectedSquare   optionalSquare
@@ -32,10 +30,6 @@ func NewService() *Service {
 	service := &Service{}
 	service.NewGame()
 	return service
-}
-
-func NewGame() *Service {
-	return NewService()
 }
 
 func (s *Service) NewGame() {

@@ -19,28 +19,33 @@ const (
 	movePriorityQuiet
 )
 
+// SearchResult contains the selected move and score returned by the AI search.
 type SearchResult struct {
 	Move    chess.Move
 	Score   int
 	HasMove bool
 }
 
+// rootMoveResult keeps a searched root move together with its original order.
 type rootMoveResult struct {
 	move          chess.Move
 	score         int
 	originalIndex int
 }
 
+// searchOptions controls deadlines and optional search optimizations.
 type searchOptions struct {
 	deadline      time.Time
 	useAspiration bool
 }
 
+// scoreResult carries a searched score and whether the search finished fully.
 type scoreResult struct {
 	score     int
 	completed bool
 }
 
+// BestMove searches the current position and returns the move chosen for the side to move.
 func BestMove(position chess.Position) SearchResult {
 	return bestMoveWithOptions(position, searchOptions{
 		deadline:      time.Now().Add(fixedSearchTimeBudget()),
@@ -48,6 +53,7 @@ func BestMove(position chess.Position) SearchResult {
 	})
 }
 
+// bestMoveWithOptions runs iterative deepening and returns the last completed result.
 func bestMoveWithOptions(position chess.Position, options searchOptions) SearchResult {
 	rootPerspective := position.SideToMove()
 	if isTerminalPosition(position) {
@@ -76,10 +82,12 @@ func bestMoveWithOptions(position chess.Position, options searchOptions) SearchR
 	return bestResult
 }
 
+// fixedSearchTimeBudget converts the fixed search depth into a conservative time budget.
 func fixedSearchTimeBudget() time.Duration {
 	return time.Second * time.Duration(FixedSearchDepth)
 }
 
+// fallbackSearchResult gives the AI a legal move if a deeper search cannot finish.
 func fallbackSearchResult(position chess.Position, move chess.Move, rootPerspective chess.Side) SearchResult {
 	next, err := position.ApplyMove(move)
 	if err != nil {
@@ -93,6 +101,7 @@ func fallbackSearchResult(position chess.Position, move chess.Move, rootPerspect
 	}
 }
 
+// searchAtDepth searches one depth, first with aspiration windows when enabled.
 func searchAtDepth(position chess.Position, depth int, previousScore int, options searchOptions) (SearchResult, bool) {
 	rootPerspective := position.SideToMove()
 	if depth <= 0 || isTerminalPosition(position) {
@@ -142,6 +151,7 @@ func searchAtDepth(position chess.Position, depth int, previousScore int, option
 	}
 }
 
+// searchAtDepthWindow searches root moves inside one alpha beta window.
 func searchAtDepthWindow(position chess.Position, depth int, alpha, beta int, options searchOptions) (SearchResult, bool) {
 	rootPerspective := position.SideToMove()
 	if depth <= 0 || isTerminalPosition(position) {
@@ -162,6 +172,7 @@ func searchAtDepthWindow(position chess.Position, depth int, alpha, beta int, op
 	return pickBestRootResult(results), true
 }
 
+// noMoveSearchResult returns a static score for terminal or move-less positions.
 func noMoveSearchResult(position chess.Position, rootPerspective chess.Side) SearchResult {
 	return SearchResult{
 		Score:   Evaluate(position, rootPerspective),
@@ -169,6 +180,7 @@ func noMoveSearchResult(position chess.Position, rootPerspective chess.Side) Sea
 	}
 }
 
+// searchRootMove applies one root move and searches the resulting position.
 func searchRootMove(position chess.Position, move chess.Move, depth int, alpha, beta int, rootPerspective chess.Side, options searchOptions) scoreResult {
 	if deadlineExceeded(options) {
 		return scoreResult{completed: false}
@@ -182,6 +194,7 @@ func searchRootMove(position chess.Position, move chess.Move, depth int, alpha, 
 	return alphaBeta(next, depth, alpha, beta, rootPerspective, options)
 }
 
+// collectRootResults evaluates ordered root moves and tracks their original order for tie breaking.
 func collectRootResults(position chess.Position, originalMoves []chess.Move, orderedMoves []chess.Move, depth int, rootPerspective chess.Side, alpha, beta int, options searchOptions) ([]rootMoveResult, bool) {
 	results := make([]rootMoveResult, 0, len(orderedMoves))
 
@@ -214,6 +227,7 @@ func collectRootResults(position chess.Position, originalMoves []chess.Move, ord
 	return results, true
 }
 
+// findMoveIndex returns the move position in the original legal move list.
 func findMoveIndex(moves []chess.Move, target chess.Move) int {
 	for index, move := range moves {
 		if move == target {
@@ -224,6 +238,7 @@ func findMoveIndex(moves []chess.Move, target chess.Move) int {
 	panic("move not found in original move list")
 }
 
+// pickBestRootResult selects the highest scoring root move with deterministic tie breaking.
 func pickBestRootResult(results []rootMoveResult) SearchResult {
 	best := results[0]
 
@@ -240,6 +255,7 @@ func pickBestRootResult(results []rootMoveResult) SearchResult {
 	}
 }
 
+// alphaBeta searches legal moves recursively and cuts off branches when the alpha beta window closes.
 func alphaBeta(position chess.Position, depth int, alpha, beta int, rootPerspective chess.Side, options searchOptions) scoreResult {
 	if deadlineExceeded(options) {
 		return scoreResult{completed: false}
@@ -306,6 +322,7 @@ func alphaBeta(position chess.Position, depth int, alpha, beta int, rootPerspect
 	}
 }
 
+// betterScore compares scores according to the current maximizing or minimizing side.
 func betterScore(candidate, current int, maximizing bool) bool {
 	if maximizing {
 		return candidate > current
@@ -314,6 +331,7 @@ func betterScore(candidate, current int, maximizing bool) bool {
 	return candidate < current
 }
 
+// isTerminalPosition checks game-ending positions that should not be searched deeper.
 func isTerminalPosition(position chess.Position) bool {
 	status := position.Status()
 	if status == chess.Checkmate || status == chess.Stalemate {
@@ -323,6 +341,7 @@ func isTerminalPosition(position chess.Position) bool {
 	return chess.HasInsufficientMaterial(position) || chess.IsFiftyMoveDraw(position)
 }
 
+// quiescence extends static evaluation through tactical moves so the search does not stop on unstable captures or promotions.
 func quiescence(position chess.Position, alpha, beta int, rootPerspective chess.Side, options searchOptions) scoreResult {
 	if deadlineExceeded(options) {
 		return scoreResult{completed: false}
@@ -390,6 +409,7 @@ func quiescence(position chess.Position, alpha, beta int, rootPerspective chess.
 	}
 }
 
+// tacticalMoves returns captures and promotions for quiescence search.
 func tacticalMoves(position chess.Position) []chess.Move {
 	moves := position.LegalMoves()
 	tactical := make([]chess.Move, 0, len(moves))
@@ -403,10 +423,12 @@ func tacticalMoves(position chess.Position) []chess.Move {
 	return orderMoves(position, tactical)
 }
 
+// evaluateStatic wraps the evaluation function used at search leaves.
 func evaluateStatic(position chess.Position, rootPerspective chess.Side) int {
 	return Evaluate(position, rootPerspective)
 }
 
+// orderMoves groups moves so tactically important moves are searched first.
 func orderMoves(position chess.Position, moves []chess.Move) []chess.Move {
 	promotions := make([]chess.Move, 0, len(moves))
 	captures := make([]chess.Move, 0, len(moves))
@@ -428,6 +450,7 @@ func orderMoves(position chess.Position, moves []chess.Move) []chess.Move {
 	return ordered
 }
 
+// movePriority assigns a simple ordering bucket to one move.
 func movePriority(position chess.Position, move chess.Move) int {
 	if move.Promotion != chess.NoPieceType {
 		return movePriorityPromotion
@@ -440,6 +463,7 @@ func movePriority(position chess.Position, move chess.Move) int {
 	return movePriorityQuiet
 }
 
+// isCaptureMove detects normal captures and en passant-style pawn captures.
 func isCaptureMove(position chess.Position, move chess.Move) bool {
 	if _, ok := position.PieceAt(move.To); ok {
 		return true
@@ -453,6 +477,7 @@ func isCaptureMove(position chess.Position, move chess.Move) bool {
 	return move.From.File() != move.To.File()
 }
 
+// deadlineExceeded reports whether the configured search deadline has passed.
 func deadlineExceeded(options searchOptions) bool {
 	if options.deadline.IsZero() {
 		return false

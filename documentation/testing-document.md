@@ -16,7 +16,7 @@ The core value of this project is in the chess logic and the search algorithm, s
 
 ## Test Layout
 
-The folder layout stays consistent with the project architecture
+The folder layout stays consistent with the layered project structure
 
 - black-box tests are kept under `internal/tests/...`
 - white-box tests stay next to the code only when package-private access is required

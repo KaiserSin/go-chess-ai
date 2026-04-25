@@ -1,6 +1,6 @@
 # Weekly Report 2
 
-During the second week I moved from planning to real implementation. The project still follows the DDD and SOLID structure from the architecture document, but now it is not only a plan anymore. The main rule is the same. Chess logic must stay inside the domain and must not depend on UI code, framework code, or application code. This gave me a clean base for building the game step by step.
+During the second week I moved from planning to real implementation. The project still follows the DDD and SOLID structure, but now it is not only a plan anymore. The main rule is the same. Chess logic must stay inside the domain and must not depend on UI code, framework code, or application code. This gave me a clean base for building the game step by step.
 
 The main work was done in `internal/domain/chess`. At first I implemented the chess domain as one package with full game rules. After that I improved the structure and split the code into logical folders inside the chess domain. Now the root `internal/domain/chess` package is a thin facade. It re-exports the main public types and constructors and stays the main entry point for the rest of the project. The real implementation is now grouped by responsibility, which makes the code easier to read and easier to extend.
 
