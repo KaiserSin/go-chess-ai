@@ -107,7 +107,7 @@ These tests check the integration between the chess rules and the service layer 
 ### AI fast black-box tests
 
 The main AI behavior tests are kept under `internal/tests/application/ai`.
-They use the public `ai.BestMove` entry point and verify the bot from the outside.
+They use the public `ai.BestMoveWithin` entry point with a short test budget and verify the bot from the outside.
 
 The fast black-box AI suite covers
 
@@ -115,20 +115,20 @@ The fast black-box AI suite covers
 - returning `HasMove = false` in checkmate and stalemate terminal positions
 - returning the only legal move when the side to move is under check
 - choosing an immediate checkmate when one is available
-- finding a forced mate inside the fixed production depth of `3` plies
+- finding a forced mate within the test time budget
 - choosing a legal promotion move in a promotion-ready position
 - avoiding a poisoned capture in a tactical position
 
 These scenarios check correctness rather than playing strength alone.
-A chess bot must recognize terminal states, avoid illegal play, and convert a forced mate when the mate is inside its search depth.
+A chess bot must recognize terminal states, avoid illegal play, and convert tactical wins when the time-limited search can reach them.
 
 ### AI extended suite
 
-The project also has a separate deterministic extended AI suite behind the `extended` build tag.
+The project also has a separate extended AI suite behind the `extended` build tag.
 It is run with `make test-ai-extended`.
 
 The extended suite uses a fixed corpus of opening positions, tactical builder positions, and terminal positions.
-For each non-terminal position it checks that repeated calls to `BestMove` return the same result, that the move is legal, and that the move can be applied successfully.
+For each non-terminal position it checks that `BestMoveWithin` returns a legal move and that the move can be applied successfully.
 For terminal positions it checks that the AI returns `HasMove = false`.
 
 ### AI white-box tests
@@ -139,7 +139,8 @@ They use package-private helpers directly when this makes the tested behavior cl
 The white-box AI tests cover
 
 - returning a legal fallback move when the search deadline is already expired
-- matching results between aspiration search and full-window search at the fixed depth of `3`
+- matching results between aspiration search and full-window search at a controlled depth of `3`
+- finding a forced mate in a controlled depth-`3` search
 - evaluating material advantage directly
 - checking that White and Black perspectives produce opposite evaluation signs
 - rewarding stronger piece placement on the board
@@ -157,13 +158,14 @@ The most important test inputs are chosen to cover correctness properties that m
 - Terminal checkmate and stalemate positions verify that the AI recognizes finished games and does not invent moves when none should be played.
 - Only legal move while in check verifies that move generation and AI selection respect forced defensive positions.
 - Immediate checkmate verifies that the AI chooses a winning tactical move when mate is directly available.
-- Forced mate within fixed depth `3` verifies that the search can find a forced win inside the actual production search depth.
+- Forced mate within the test budget verifies that the public time-limited search can find a forced win in a representative tactical position.
+- Controlled depth-`3` white-box search verifies that depth-specific search behavior still works independently of the production time budget.
 - Poisoned capture position verifies that the AI is not only greedy about material and can avoid a capture that loses tactically.
 - Promotion-ready position verifies that the AI can return a legal promotion move and that the promoted piece appears on the expected square.
 - Direct evaluation positions verify that the heuristic rewards material, piece placement, pawn structure, king safety, and endgame king activity in controlled positions.
 - Castling, en passant, promotion, repetition, fifty-move rule, and insufficient material domain tests verify the non-trivial chess rules that the AI and gameplay service rely on.
 - Gameplay promotion and AI service tests verify that the application layer handles user-facing state transitions such as pending promotion, finished games, and AI replies.
-- Extended deterministic AI corpus verifies repeated AI calls on opening, tactical, and terminal positions so that legal move selection stays deterministic and repeatable.
+- Extended AI corpus verifies legal AI calls on opening, tactical, and terminal positions.
 
 ## Rationale
 

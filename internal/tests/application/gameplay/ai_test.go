@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/KaiserSin/go-chess-ai/internal/application/ai"
+	"github.com/KaiserSin/go-chess-ai/internal/application/dto"
 	"github.com/KaiserSin/go-chess-ai/internal/application/gameplay"
 	chess "github.com/KaiserSin/go-chess-ai/internal/domain/chess"
 )
@@ -12,10 +12,6 @@ import (
 func TestApplyAIMoveMakesMoveAndChangesTurn(t *testing.T) {
 	service := gameplay.NewService()
 	before := service.Snapshot()
-	expected := ai.BestMove(chess.NewInitialPosition())
-	if !expected.HasMove {
-		t.Fatal("want best move for initial position")
-	}
 
 	if err := service.ApplyAIMove(); err != nil {
 		t.Fatalf("want ai move, got %v", err)
@@ -26,13 +22,8 @@ func TestApplyAIMoveMakesMoveAndChangesTurn(t *testing.T) {
 		t.Fatalf("want black to move, got %q", snapshot.SideToMove)
 	}
 
-	movedPiece := squareByAlgebraic(t, before, expected.Move.From.String()).PieceKey
-	if square := squareByAlgebraic(t, snapshot, expected.Move.From.String()); square.Occupied {
-		t.Fatalf("did not expect piece on %s after ai move", expected.Move.From)
-	}
-
-	if square := squareByAlgebraic(t, snapshot, expected.Move.To.String()); square.PieceKey != movedPiece {
-		t.Fatalf("want %s on %s, got %q", movedPiece, expected.Move.To, square.PieceKey)
+	if changed := changedSquareCount(before, snapshot); changed != 2 {
+		t.Fatalf("want exactly one quiet move from initial position, got %d changed squares", changed)
 	}
 }
 
@@ -77,4 +68,20 @@ func mustPlayMove(t *testing.T, service *gameplay.Service, fromFile, fromRank, t
 	if err := service.TryMoveAt(toFile, toRank); err != nil {
 		t.Fatalf("want move %d,%d -> %d,%d, got %v", fromFile, fromRank, toFile, toRank, err)
 	}
+}
+
+func changedSquareCount(before, after dto.GameSnapshot) int {
+	changed := 0
+	afterBySquare := make(map[string]string, len(after.Squares))
+	for _, square := range after.Squares {
+		afterBySquare[square.Algebraic] = square.PieceKey
+	}
+
+	for _, square := range before.Squares {
+		if afterBySquare[square.Algebraic] != square.PieceKey {
+			changed++
+		}
+	}
+
+	return changed
 }

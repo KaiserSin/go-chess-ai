@@ -7,10 +7,10 @@ import (
 )
 
 const (
-	FixedSearchDepth    = 3
-	searchInfinity      = mateScore + 1
-	aspirationWindow    = 50
-	fullWindowThreshold = searchInfinity
+	DefaultSearchTimeBudget = 3 * time.Second
+	searchInfinity          = mateScore + 1
+	aspirationWindow        = 50
+	fullWindowThreshold     = searchInfinity
 )
 
 const (
@@ -47,14 +47,23 @@ type scoreResult struct {
 
 // BestMove searches the current position and returns the move chosen for the side to move.
 func BestMove(position chess.Position) SearchResult {
+	return BestMoveWithin(position, DefaultSearchTimeBudget)
+}
+
+// BestMoveWithin searches the current position until the time budget expires.
+func BestMoveWithin(position chess.Position, budget time.Duration) SearchResult {
 	return bestMoveWithOptions(position, searchOptions{
-		deadline:      time.Now().Add(fixedSearchTimeBudget()),
+		deadline:      time.Now().Add(budget),
 		useAspiration: true,
 	})
 }
 
 // bestMoveWithOptions runs iterative deepening and returns the last completed result.
 func bestMoveWithOptions(position chess.Position, options searchOptions) SearchResult {
+	if options.deadline.IsZero() {
+		options.deadline = time.Now().Add(DefaultSearchTimeBudget)
+	}
+
 	rootPerspective := position.SideToMove()
 	if isTerminalPosition(position) {
 		return noMoveSearchResult(position, rootPerspective)
@@ -69,7 +78,7 @@ func bestMoveWithOptions(position chess.Position, options searchOptions) SearchR
 	bestResult := fallbackSearchResult(position, orderedMoves[0], rootPerspective)
 	previousScore := 0
 
-	for currentDepth := 1; currentDepth <= FixedSearchDepth; currentDepth++ {
+	for currentDepth := 1; ; currentDepth++ {
 		result, completed := searchAtDepth(position, currentDepth, previousScore, options)
 		if !completed {
 			break
@@ -80,11 +89,6 @@ func bestMoveWithOptions(position chess.Position, options searchOptions) SearchR
 	}
 
 	return bestResult
-}
-
-// fixedSearchTimeBudget converts the fixed search depth into a conservative time budget.
-func fixedSearchTimeBudget() time.Duration {
-	return time.Second * time.Duration(FixedSearchDepth)
 }
 
 // fallbackSearchResult gives the AI a legal move if a deeper search cannot finish.

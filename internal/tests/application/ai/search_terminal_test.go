@@ -3,7 +3,6 @@ package ai_test
 import (
 	"testing"
 
-	"github.com/KaiserSin/go-chess-ai/internal/application/ai"
 	chess "github.com/KaiserSin/go-chess-ai/internal/domain/chess"
 )
 
@@ -14,7 +13,7 @@ func TestBestMoveTerminalCheckmateReturnsNoMove(t *testing.T) {
 		t.Fatalf("want checkmate, got %s", position.Status())
 	}
 
-	result := ai.BestMove(position)
+	result := bestMoveForTest(t, position)
 	if result.HasMove {
 		t.Fatal("did not expect move")
 	}
@@ -31,7 +30,7 @@ func TestBestMoveTerminalStalemateReturnsNoMove(t *testing.T) {
 		t.Fatalf("want stalemate, got %s", position.Status())
 	}
 
-	result := ai.BestMove(position)
+	result := bestMoveForTest(t, position)
 	if result.HasMove {
 		t.Fatal("did not expect move")
 	}

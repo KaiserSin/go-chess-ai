@@ -3,14 +3,13 @@ package ai_test
 import (
 	"testing"
 
-	"github.com/KaiserSin/go-chess-ai/internal/application/ai"
 	chess "github.com/KaiserSin/go-chess-ai/internal/domain/chess"
 )
 
 func TestBestMoveReturnsLegalMoveFromInitialPosition(t *testing.T) {
 	position := chess.NewInitialPosition()
 
-	result := ai.BestMove(position)
+	result := bestMoveForTest(t, position)
 	if !result.HasMove {
 		t.Fatal("want best move")
 	}
@@ -37,7 +36,7 @@ func TestBestMoveReturnsOnlyLegalMoveWhileInCheck(t *testing.T) {
 		t.Fatalf("want only move %s, got %s", onlyMove, legalMoves[0])
 	}
 
-	result := ai.BestMove(position)
+	result := bestMoveForTest(t, position)
 	if !result.HasMove {
 		t.Fatal("want best move")
 	}
@@ -61,7 +60,7 @@ func TestBestMoveChoosesLegalPromotionMove(t *testing.T) {
 		t.Fatal("test fixture must offer promotion moves")
 	}
 
-	result := ai.BestMove(position)
+	result := bestMoveForTest(t, position)
 	if !result.HasMove {
 		t.Fatal("want best move")
 	}

@@ -6,7 +6,6 @@ package ai_test
 import (
 	"testing"
 
-	"github.com/KaiserSin/go-chess-ai/internal/application/ai"
 	chess "github.com/KaiserSin/go-chess-ai/internal/domain/chess"
 )
 
@@ -18,7 +17,7 @@ type extendedPositionCase struct {
 func TestBestMoveExtendedCorpusNonTerminalPositions(t *testing.T) {
 	for _, tc := range extendedNonTerminalCases(t) {
 		t.Run(tc.name, func(t *testing.T) {
-			result := deterministicBestMove(t, tc.position)
+			result := bestMoveForTest(t, tc.position)
 			if !result.HasMove {
 				t.Fatal("want best move")
 			}
@@ -39,26 +38,12 @@ func TestBestMoveExtendedCorpusNonTerminalPositions(t *testing.T) {
 func TestBestMoveExtendedCorpusTerminalPositions(t *testing.T) {
 	for _, tc := range extendedTerminalCases(t) {
 		t.Run(tc.name, func(t *testing.T) {
-			result := ai.BestMove(tc.position)
+			result := bestMoveForTest(t, tc.position)
 			if result.HasMove {
 				t.Fatalf("did not expect move, got %s", result.Move)
 			}
 		})
 	}
-}
-
-func deterministicBestMove(t *testing.T, position chess.Position) ai.SearchResult {
-	t.Helper()
-
-	first := ai.BestMove(position)
-	for attempt := 0; attempt < 4; attempt++ {
-		next := ai.BestMove(position)
-		if next != first {
-			t.Fatalf("want deterministic result, first=%+v next=%+v", first, next)
-		}
-	}
-
-	return first
 }
 
 func extendedNonTerminalCases(t *testing.T) []extendedPositionCase {

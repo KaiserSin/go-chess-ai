@@ -41,18 +41,49 @@ func TestAspirationSearchMatchesFullWindowSearch(t *testing.T) {
 			Place(mustParseSquare(t, "h4"), chess.Black, chess.King),
 	)
 
-	deadline := time.Now().Add(10 * time.Second)
-	withAspiration := bestMoveWithOptions(position, searchOptions{
-		deadline:      deadline,
-		useAspiration: true,
-	})
-	withoutAspiration := bestMoveWithOptions(position, searchOptions{
-		deadline:      deadline,
+	previous, completed := searchAtDepth(position, 2, 0, searchOptions{
 		useAspiration: false,
 	})
+	if !completed {
+		t.Fatal("want completed previous depth")
+	}
+
+	withAspiration, completed := searchAtDepth(position, 3, previous.Score, searchOptions{
+		useAspiration: true,
+	})
+	if !completed {
+		t.Fatal("want completed aspiration search")
+	}
+
+	withoutAspiration, completed := searchAtDepth(position, 3, 0, searchOptions{
+		useAspiration: false,
+	})
+	if !completed {
+		t.Fatal("want completed full-window search")
+	}
 
 	if withAspiration != withoutAspiration {
 		t.Fatalf("want matching search results, with aspiration=%+v without aspiration=%+v", withAspiration, withoutAspiration)
+	}
+}
+
+func TestSearchAtDepthFindsForcedMateAtThreePlies(t *testing.T) {
+	position := forcedMateDepthThreeSearchPosition(t)
+
+	if !canForceMateForSearchTest(position, 3, chess.White) {
+		t.Fatal("test fixture must contain forced mate within three plies")
+	}
+
+	result, completed := searchAtDepth(position, 3, 0, searchOptions{
+		useAspiration: false,
+	})
+	if !completed {
+		t.Fatal("want completed controlled-depth search")
+	}
+
+	next := mustApplyMoveForSearchTest(t, position, result.Move)
+	if !canForceMateForSearchTest(next, 2, chess.White) {
+		t.Fatalf("want move that keeps forced mate, got %s", result.Move)
 	}
 }
 
@@ -76,6 +107,73 @@ func mustParseSquare(t *testing.T, raw string) chess.Square {
 	}
 
 	return square
+}
+
+func mustApplyMoveForSearchTest(t *testing.T, position chess.Position, move chess.Move) chess.Position {
+	t.Helper()
+
+	next, err := position.ApplyMove(move)
+	if err != nil {
+		t.Fatalf("ApplyMove(%s) error: %v", move, err)
+	}
+
+	return next
+}
+
+func forcedMateDepthThreeSearchPosition(t *testing.T) chess.Position {
+	t.Helper()
+
+	return mustBuildPosition(t,
+		chess.NewPositionBuilder().
+			WithSideToMove(chess.White).
+			Place(mustParseSquare(t, "e2"), chess.White, chess.King).
+			Place(mustParseSquare(t, "f2"), chess.White, chess.Queen).
+			Place(mustParseSquare(t, "b5"), chess.White, chess.Rook).
+			Place(mustParseSquare(t, "h4"), chess.Black, chess.King),
+	)
+}
+
+func canForceMateForSearchTest(position chess.Position, plies int, attacker chess.Side) bool {
+	if position.Status() == chess.Checkmate {
+		return position.SideToMove().Opponent() == attacker
+	}
+
+	if position.Status() == chess.Stalemate || chess.HasInsufficientMaterial(position) || chess.IsFiftyMoveDraw(position) || plies == 0 {
+		return false
+	}
+
+	moves := position.LegalMoves()
+	if len(moves) == 0 {
+		return false
+	}
+
+	if position.SideToMove() == attacker {
+		for _, move := range moves {
+			next, err := position.ApplyMove(move)
+			if err != nil {
+				panic(err)
+			}
+
+			if canForceMateForSearchTest(next, plies-1, attacker) {
+				return true
+			}
+		}
+
+		return false
+	}
+
+	for _, move := range moves {
+		next, err := position.ApplyMove(move)
+		if err != nil {
+			panic(err)
+		}
+
+		if !canForceMateForSearchTest(next, plies-1, attacker) {
+			return false
+		}
+	}
+
+	return true
 }
 
 func containsMove(moves []chess.Move, target chess.Move) bool {

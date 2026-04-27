@@ -4,7 +4,7 @@ Go Chess AI is a desktop chess application written in Go.
 The project includes a full chess rule implementation, a graphical board built with Ebiten, and a human versus AI game mode.
 
 The chess logic is implemented without external chess libraries.
-The AI uses a fixed search depth of `3` and is based on alpha-beta search with iterative deepening, aspiration windows, quiescence search, move ordering, and a hand-tuned positional evaluation function.
+The AI uses time-limited iterative deepening alpha-beta search with aspiration windows, quiescence search, move ordering, and a hand-tuned positional evaluation function.
 
 ## Features
 
@@ -13,7 +13,7 @@ The AI uses a fixed search depth of `3` and is based on alpha-beta search with i
 - legal move validation for all pieces
 - check, checkmate, and stalemate detection
 - castling, en passant, pawn promotion, and common draw rules
-- AI opponent with fixed-depth search and positional evaluation
+- AI opponent with time-limited search and positional evaluation
 - automated tests for chess rules, gameplay flow, and AI behavior
 
 ## Documentation
@@ -28,6 +28,7 @@ The AI uses a fixed search depth of `3` and is based on alpha-beta search with i
   - [Week 3](documentation/weekly-reports/week-three.md)
   - [Week 4](documentation/weekly-reports/week-four.md)
   - [Week 5](documentation/weekly-reports/week-five.md)
+  - [Week 6](documentation/weekly-reports/week-six.md)
 
 ## Quick Start
 

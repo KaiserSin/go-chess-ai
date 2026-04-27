@@ -2,9 +2,13 @@ package ai_test
 
 import (
 	"testing"
+	"time"
 
+	"github.com/KaiserSin/go-chess-ai/internal/application/ai"
 	chess "github.com/KaiserSin/go-chess-ai/internal/domain/chess"
 )
+
+const testSearchTimeBudget = 750 * time.Millisecond
 
 func mustBuildPosition(t testing.TB, builder *chess.PositionBuilder) chess.Position {
 	t.Helper()
@@ -72,6 +76,12 @@ func mustApplyMove(t testing.TB, position chess.Position, move chess.Move) chess
 	}
 
 	return next
+}
+
+func bestMoveForTest(t testing.TB, position chess.Position) ai.SearchResult {
+	t.Helper()
+
+	return ai.BestMoveWithin(position, testSearchTimeBudget)
 }
 
 func hasImmediateMate(position chess.Position) bool {

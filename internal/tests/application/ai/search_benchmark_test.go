@@ -2,6 +2,7 @@ package ai_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/KaiserSin/go-chess-ai/internal/application/ai"
 	chess "github.com/KaiserSin/go-chess-ai/internal/domain/chess"
@@ -32,7 +33,7 @@ func BenchmarkBestMove(b *testing.B) {
 	for _, tc := range cases {
 		b.Run(tc.name, func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				bestMoveBenchmarkResult = ai.BestMove(tc.position)
+				bestMoveBenchmarkResult = ai.BestMoveWithin(tc.position, 100*time.Millisecond)
 			}
 		})
 	}

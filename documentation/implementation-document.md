@@ -11,8 +11,8 @@ The program supports
 - check, checkmate, stalemate, castling, en passant, promotion, and draw rules
 - a desktop chess board with mouse interaction
 - a start menu where the user chooses a side
-- a fixed AI search depth of `3`
-- an AI based on alpha-beta search, iterative deepening, aspiration windows, quiescence search, a hard time cutoff, and a simple hand-tuned evaluation function
+- an AI with a default move budget of three seconds
+- an AI based on time-limited iterative deepening alpha-beta search, aspiration windows, quiescence search, move ordering, and a simple hand-tuned evaluation function
 
 ## Project structure
 
@@ -39,11 +39,11 @@ The most important algorithms and operations in the project are listed below.
 
 - Evaluation function runs in `O(64)`. On a fixed chess board this is effectively `O(1)`. The function scans the board and calculates material and positional terms
 - Move ordering runs in `O(m)`, where `m` is the number of legal moves in the current position. It groups moves into categories such as promotions, captures, and quiet moves
-- Alpha-beta search has worst-case time complexity `O(b^d)`, where `b` is the branching factor and `d` is the search depth. In practice, move ordering and pruning reduce the number of visited nodes
+- Alpha-beta search has worst-case time complexity `O(b^d)`, where `b` is the branching factor and `d` is the completed search depth reached within the time budget. In practice, move ordering and pruning reduce the number of visited nodes
 - Iterative deepening has the same asymptotic order as the deepest search, but it repeats some work from shallow searches. In practice it still helps because shallow searches can make the final move choice more stable
 - Aspiration windows do not change the asymptotic worst-case order. In practice they can reduce work when the score from the previous depth is a good estimate for the next depth
 - Quiescence search does not have one simple fixed bound in practice. Its cost depends on the number of tactical continuations. It increases search work, but reduces simple tactical blunders
-- Hard time cutoff bounds the wall-clock time of one search call. It does not change worst-case tree shape, but it prevents one search iteration from running indefinitely relative to the configured budget
+- Hard time cutoff bounds the wall-clock time of one search call. It does not change worst-case tree shape, but it makes the engine return the last fully completed iterative-deepening result when the budget expires
 
 The main space cost is
 
@@ -51,28 +51,28 @@ The main space cost is
 
 ## Performance and O-analysis comparison
 
-This comparison combines theoretical analysis with a small local benchmark for `BestMove`.
+This comparison combines theoretical analysis with a small local benchmark for `BestMoveWithin`.
 
 - Plain minimax searches all branches up to depth `d`. Alpha-beta prunes many branches. The worst-case order is still `O(b^d)`, but alpha-beta is much faster in practice
 - Without move ordering, alpha-beta still works, but pruning is weaker. With move ordering, stronger moves are searched first, so cutoffs happen earlier and the running time is better
 - Aspiration windows reuse the previous iterative-deepening score as a narrow initial search window. When that estimate is good, the next depth can be searched with fewer nodes than a full-window search
 - Without quiescence search, the evaluation can stop in unstable tactical positions. With quiescence search, the engine continues searching tactical moves and avoids some simple blunders, even though it increases the amount of work
-- Hard time cutoff keeps search latency bounded, but it can also force the engine to return the last fully completed depth instead of the nominal target depth
+- Hard time cutoff keeps search latency bounded, but it can also force the engine to return the last fully completed depth instead of finishing the depth currently being searched
 
 ## Performance measurements
 
 The following measurements were run locally on Apple M4 with Go `1.26.1` on darwin arm64.
-The command was `go test -bench BenchmarkBestMove -run '^$' ./internal/tests/application/ai`.
-The numbers are practical measurements for the current fixed search depth of `3`.
+The command was `go test -bench BenchmarkBestMove -benchtime=1x -run '^$' ./internal/tests/application/ai`.
+The benchmark uses `BestMoveWithin` with a `100 ms` budget so that benchmark runs stay short.
 They are not a formal proof of time complexity and can vary on another computer.
 
-| Position | Time per `BestMove` |
+| Position | Time per `BestMoveWithin` |
 | - | - |
-| Initial position | about 122 ms |
-| Opening after four moves | about 283 ms |
-| Poisoned capture tactic | about 60 ms |
-| Forced mate at depth three | about 488 ms |
-| Promotion-ready position | about 4.4 ms |
+| Initial position | about 100 ms |
+| Opening after four moves | about 100 ms |
+| Poisoned capture tactic | about 100 ms |
+| Forced mate at depth three | about 100 ms |
+| Promotion-ready position | about 100 ms |
 
 ## Possible flaws and improvements
 
@@ -80,12 +80,11 @@ There are still several clear limitations in the project.
 
 The AI uses a hand-tuned evaluation function.
 It is better than a pure material count, but it is still simple.
-The program does not use an opening book, endgame tablebases, killer heuristic, history heuristic, or time-based search.
+The program does not use an opening book, endgame tablebases, killer heuristic, history heuristic, or clock-aware time management.
 Because of this, the AI is still much weaker than a mature chess engine.
 
-The current search depth is intentionally fixed at `3`.
-This keeps response time predictable and simplifies the menu flow, but it also limits playing strength.
-The engine now also uses a hard deadline per search call, so in difficult positions it can stop after the last completed iterative-deepening layer instead of finishing the nominal target depth.
+The current search uses a fixed per-move time budget rather than a full chess-clock time manager.
+This keeps response time predictable, but the engine does not adapt its thinking time to the position, remaining clock time, or game phase.
 
 The project has only a small local benchmark table.
 There is still no broad measured comparison between different search configurations or evaluation versions.
@@ -93,7 +92,7 @@ There is still no broad measured comparison between different search configurati
 Possible future improvements
 
 - add an opening book
-- add time-based search and time management
+- add clock-aware time management
 - add killer and history heuristics
 - improve the evaluation function with more positional terms
 - create broader benchmark measurements for different depths and search variants

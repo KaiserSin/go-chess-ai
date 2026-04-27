@@ -20,8 +20,8 @@ All chess logic is implemented in the project without external chess libraries.
 ## Algorithms and Data Structures
 
 The main search is a minimax-style game tree search with alpha-beta pruning.
-The AI uses a fixed search depth of `3`.
-The current search also uses iterative deepening, aspiration windows, quiescence search, and move ordering.
+The AI uses time-limited iterative deepening and searches as deeply as it can within the configured move budget.
+The current search also uses aspiration windows, quiescence search, and move ordering.
 The evaluation function considers material and positional factors such as piece placement, pawn structure, king safety, and simple endgame bonuses.
 
 The project uses the following data structures
@@ -38,7 +38,7 @@ The program validates the move, updates the board state, and then lets the AI ca
 
 ## Expected Time and Space Complexity
 
-The time complexity of plain Minimax is `O(b^d)`, where `b` is the branching factor and `d` is the search depth.
+The time complexity of plain Minimax is `O(b^d)`, where `b` is the branching factor and `d` is the completed search depth reached within the time budget.
 Alpha-beta pruning keeps the same worst-case order, but it reduces the amount of explored work in practice and in the best case improves the search toward `O(b^(d/2))`.
 
 Move ordering, aspiration windows, and iterative deepening are used to make the practical search more efficient and stable.

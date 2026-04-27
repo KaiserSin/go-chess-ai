@@ -2,11 +2,9 @@ package ai_test
 
 import (
 	"testing"
-
-	"github.com/KaiserSin/go-chess-ai/internal/application/ai"
 )
 
-func TestBestMoveAvoidsPoisonedCaptureAtFixedDepth(t *testing.T) {
+func TestBestMoveAvoidsPoisonedCaptureWithinTimeBudget(t *testing.T) {
 	position := poisonedCapturePosition(t)
 	poisonedCapture := mustMove(t, "d1", "d7")
 
@@ -14,7 +12,7 @@ func TestBestMoveAvoidsPoisonedCaptureAtFixedDepth(t *testing.T) {
 		t.Fatal("test fixture must offer poisoned capture")
 	}
 
-	result := ai.BestMove(position)
+	result := bestMoveForTest(t, position)
 	if !result.HasMove {
 		t.Fatal("want best move")
 	}
