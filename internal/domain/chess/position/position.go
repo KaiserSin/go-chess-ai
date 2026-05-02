@@ -70,5 +70,24 @@ func (p Position) validate() error {
 		return chessmodel.ErrInvalidPosition
 	}
 
+	if p.kingsAreAdjacent() {
+		return chessmodel.ErrInvalidPosition
+	}
+
+	if p.isInCheck(p.sideToMove.Opponent()) {
+		return chessmodel.ErrInvalidPosition
+	}
+
 	return nil
+}
+
+func (p Position) kingsAreAdjacent() bool {
+	whiteKing, whiteOk := p.board.kingSquare(chessmodel.White)
+	blackKing, blackOk := p.board.kingSquare(chessmodel.Black)
+	if !whiteOk || !blackOk {
+		return false
+	}
+
+	return absInt(whiteKing.File()-blackKing.File()) <= 1 &&
+		absInt(whiteKing.Rank()-blackKing.Rank()) <= 1
 }

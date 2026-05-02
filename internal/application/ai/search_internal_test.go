@@ -35,10 +35,9 @@ func TestAspirationSearchMatchesFullWindowSearch(t *testing.T) {
 	position := mustBuildPosition(t,
 		chess.NewPositionBuilder().
 			WithSideToMove(chess.White).
-			Place(mustParseSquare(t, "e2"), chess.White, chess.King).
-			Place(mustParseSquare(t, "f2"), chess.White, chess.Queen).
-			Place(mustParseSquare(t, "b5"), chess.White, chess.Rook).
-			Place(mustParseSquare(t, "h4"), chess.Black, chess.King),
+			Place(mustParseSquare(t, "c3"), chess.White, chess.King).
+			Place(mustParseSquare(t, "d3"), chess.White, chess.Queen).
+			Place(mustParseSquare(t, "a1"), chess.Black, chess.King),
 	)
 
 	previous, completed := searchAtDepth(position, 2, 0, searchOptions{
@@ -87,6 +86,36 @@ func TestSearchAtDepthFindsForcedMateAtThreePlies(t *testing.T) {
 	}
 }
 
+func TestQuiescenceSearchesEvasionsWhenSideToMoveIsInCheck(t *testing.T) {
+	position := mustBuildPosition(t,
+		chess.NewPositionBuilder().
+			WithSideToMove(chess.White).
+			Place(mustParseSquare(t, "e1"), chess.White, chess.King).
+			Place(mustParseSquare(t, "a1"), chess.White, chess.Queen).
+			Place(mustParseSquare(t, "h7"), chess.Black, chess.King).
+			Place(mustParseSquare(t, "e8"), chess.Black, chess.Rook),
+	)
+
+	if position.Status() != chess.Check {
+		t.Fatalf("want check, got %s", position.Status())
+	}
+
+	result := quiescence(position, -searchInfinity, searchInfinity, chess.White, searchOptions{})
+	if !result.completed {
+		t.Fatal("want completed quiescence search")
+	}
+
+	standPat := evaluateStatic(position, chess.White)
+	if result.score == standPat {
+		t.Fatalf("did not expect stand-pat score while in check, got %d", result.score)
+	}
+
+	expected := bestQuiescenceEvasionScore(t, position, chess.White)
+	if result.score != expected {
+		t.Fatalf("want best evasion score %d, got %d", expected, result.score)
+	}
+}
+
 func mustBuildPosition(t *testing.T, builder *chess.PositionBuilder) chess.Position {
 	t.Helper()
 
@@ -96,6 +125,30 @@ func mustBuildPosition(t *testing.T, builder *chess.PositionBuilder) chess.Posit
 	}
 
 	return position
+}
+
+func bestQuiescenceEvasionScore(t *testing.T, position chess.Position, rootPerspective chess.Side) int {
+	t.Helper()
+
+	moves := orderMoves(position, position.LegalMoves())
+	if len(moves) == 0 {
+		t.Fatal("test fixture must contain at least one legal evasion")
+	}
+
+	bestScore := 0
+	for index, move := range moves {
+		next := mustApplyMoveForSearchTest(t, position, move)
+		result := quiescence(next, -searchInfinity, searchInfinity, rootPerspective, searchOptions{})
+		if !result.completed {
+			t.Fatal("want completed child quiescence search")
+		}
+
+		if index == 0 || result.score > bestScore {
+			bestScore = result.score
+		}
+	}
+
+	return bestScore
 }
 
 func mustParseSquare(t *testing.T, raw string) chess.Square {
@@ -126,10 +179,9 @@ func forcedMateDepthThreeSearchPosition(t *testing.T) chess.Position {
 	return mustBuildPosition(t,
 		chess.NewPositionBuilder().
 			WithSideToMove(chess.White).
-			Place(mustParseSquare(t, "e2"), chess.White, chess.King).
-			Place(mustParseSquare(t, "f2"), chess.White, chess.Queen).
-			Place(mustParseSquare(t, "b5"), chess.White, chess.Rook).
-			Place(mustParseSquare(t, "h4"), chess.Black, chess.King),
+			Place(mustParseSquare(t, "c3"), chess.White, chess.King).
+			Place(mustParseSquare(t, "d3"), chess.White, chess.Queen).
+			Place(mustParseSquare(t, "a1"), chess.Black, chess.King),
 	)
 }
 

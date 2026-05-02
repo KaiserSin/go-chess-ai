@@ -37,7 +37,7 @@ run_package() {
 }
 
 printf 'Package coverage:\n'
-run_package domain ./internal/domain/chess "$tmp_dir/domain.cover" ./internal/tests/domain/chess
+run_package domain ./internal/domain/chess/... "$tmp_dir/domain.cover" ./internal/tests/domain/chess
 run_package gameplay ./internal/application/gameplay "$tmp_dir/gameplay.cover" ./internal/tests/application/gameplay ./internal/application/gameplay
 run_package ai ./internal/application/ai "$tmp_dir/ai.cover" ./internal/tests/application/ai ./internal/application/ai
 

@@ -62,6 +62,45 @@ func TestStartPosition(t *testing.T) {
 	}
 }
 
+func TestPositionBuilderRejectsAdjacentKings(t *testing.T) {
+	_, err := chess.NewPositionBuilder().
+		WithSideToMove(chess.White).
+		Place(mustParseSquare(t, "e1"), chess.White, chess.King).
+		Place(mustParseSquare(t, "e2"), chess.Black, chess.King).
+		Build()
+
+	if !errors.Is(err, chess.ErrInvalidPosition) {
+		t.Fatalf("want invalid position error, got %v", err)
+	}
+}
+
+func TestPositionBuilderRejectsSideNotToMoveInCheck(t *testing.T) {
+	_, err := chess.NewPositionBuilder().
+		WithSideToMove(chess.White).
+		Place(mustParseSquare(t, "h1"), chess.White, chess.King).
+		Place(mustParseSquare(t, "e1"), chess.White, chess.Rook).
+		Place(mustParseSquare(t, "e8"), chess.Black, chess.King).
+		Build()
+
+	if !errors.Is(err, chess.ErrInvalidPosition) {
+		t.Fatalf("want invalid position error, got %v", err)
+	}
+}
+
+func TestPositionBuilderAllowsSideToMoveInCheck(t *testing.T) {
+	position := mustBuildPosition(t,
+		chess.NewPositionBuilder().
+			WithSideToMove(chess.Black).
+			Place(mustParseSquare(t, "h1"), chess.White, chess.King).
+			Place(mustParseSquare(t, "e1"), chess.White, chess.Rook).
+			Place(mustParseSquare(t, "e8"), chess.Black, chess.King),
+	)
+
+	if position.Status() != chess.Check {
+		t.Fatalf("want check, got %s", position.Status())
+	}
+}
+
 func TestBadMoveInput(t *testing.T) {
 	position := chess.NewInitialPosition()
 

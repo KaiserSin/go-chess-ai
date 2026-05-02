@@ -187,13 +187,10 @@ func stalematePosition(t testing.TB) chess.Position {
 func immediateMatePosition(t testing.TB) chess.Position {
 	t.Helper()
 
-	return mustBuildPosition(t,
-		chess.NewPositionBuilder().
-			WithSideToMove(chess.White).
-			Place(mustParseSquare(t, "d3"), chess.White, chess.King).
-			Place(mustParseSquare(t, "f2"), chess.White, chess.Knight).
-			Place(mustParseSquare(t, "g1"), chess.White, chess.Queen).
-			Place(mustParseSquare(t, "c1"), chess.Black, chess.King),
+	return mustPositionFromMoves(t,
+		mustMove(t, "f2", "f3"),
+		mustMove(t, "e7", "e5"),
+		mustMove(t, "g2", "g4"),
 	)
 }
 
@@ -203,10 +200,9 @@ func forcedMateDepthThreePosition(t testing.TB) chess.Position {
 	return mustBuildPosition(t,
 		chess.NewPositionBuilder().
 			WithSideToMove(chess.White).
-			Place(mustParseSquare(t, "e2"), chess.White, chess.King).
-			Place(mustParseSquare(t, "f2"), chess.White, chess.Queen).
-			Place(mustParseSquare(t, "b5"), chess.White, chess.Rook).
-			Place(mustParseSquare(t, "h4"), chess.Black, chess.King),
+			Place(mustParseSquare(t, "c3"), chess.White, chess.King).
+			Place(mustParseSquare(t, "d3"), chess.White, chess.Queen).
+			Place(mustParseSquare(t, "a1"), chess.Black, chess.King),
 	)
 }
 

@@ -351,6 +351,10 @@ func quiescence(position chess.Position, alpha, beta int, rootPerspective chess.
 		return scoreResult{completed: false}
 	}
 
+	if position.IsInCheck(position.SideToMove()) {
+		return quiescenceEvasions(position, alpha, beta, rootPerspective, options)
+	}
+
 	standPat := evaluateStatic(position, rootPerspective)
 	maximizing := position.SideToMove() == rootPerspective
 	bestScore := standPat
@@ -391,6 +395,58 @@ func quiescence(position chess.Position, alpha, beta int, rootPerspective chess.
 
 		score := result.score
 		if betterScore(score, bestScore, maximizing) {
+			bestScore = score
+		}
+
+		if maximizing {
+			if score > alpha {
+				alpha = score
+			}
+		} else if score < beta {
+			beta = score
+		}
+
+		if alpha >= beta {
+			break
+		}
+	}
+
+	return scoreResult{
+		score:     bestScore,
+		completed: true,
+	}
+}
+
+// quiescenceEvasions searches all legal check evasions because stand-pat is invalid while in check.
+func quiescenceEvasions(position chess.Position, alpha, beta int, rootPerspective chess.Side, options searchOptions) scoreResult {
+	moves := orderMoves(position, position.LegalMoves())
+	if len(moves) == 0 {
+		return scoreResult{
+			score:     evaluateStatic(position, rootPerspective),
+			completed: true,
+		}
+	}
+
+	maximizing := position.SideToMove() == rootPerspective
+	bestScore := 0
+
+	for index, move := range moves {
+		if deadlineExceeded(options) {
+			return scoreResult{completed: false}
+		}
+
+		next, err := position.ApplyMove(move)
+		if err != nil {
+			panic(err)
+		}
+
+		result := quiescence(next, alpha, beta, rootPerspective, options)
+		if !result.completed {
+			return scoreResult{completed: false}
+		}
+
+		score := result.score
+		if index == 0 || betterScore(score, bestScore, maximizing) {
 			bestScore = score
 		}
 

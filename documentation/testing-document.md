@@ -45,7 +45,7 @@ make coverage
 
 The coverage command reports coverage for the current core packages
 
-- `internal/domain/chess`
+- `internal/domain/chess/...`
 - `internal/application/gameplay`
 - `internal/application/ai`
 
@@ -53,15 +53,16 @@ Current coverage report from `make coverage`
 
 ```text
 Package coverage
-domain     100.0%
-gameplay   76.6%
-ai         90.2%
+domain     85.4%
+gameplay   77.1%
+ai         92.2%
 
 Combined coverage
-total statements 86.6%
+total statements 86.7%
 ```
 
 The coverage script combines the core package reports and enforces at least `75.0%` combined statement coverage.
+The domain coverage includes the public chess facade and its implementation subpackages under `internal/domain/chess/...`.
 Presentation code is not included in this target because the project tests focus on chess rules, gameplay state, and AI behavior rather than rendering.
 
 The focus stays on representative correctness scenarios rather than rebuilding low-level coverage-only tests.
